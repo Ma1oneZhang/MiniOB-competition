@@ -490,14 +490,7 @@ expression:
     ;
 
 select_attr:
-    '*' {
-      $$ = new std::vector<RelAttrSqlNode>;
-      RelAttrSqlNode attr;
-      attr.relation_name  = "";
-      attr.attribute_name = "*";
-      $$->emplace_back(attr);
-    }
-    | rel_attr attr_list {
+    rel_attr attr_list {
       if ($2 != nullptr) {
         $$ = $2;
       } else {
@@ -509,7 +502,12 @@ select_attr:
     ;
 
 rel_attr:
-    ID {
+    '*' {
+      $$ = new RelAttrSqlNode;
+      $$->relation_name  = "";
+      $$->attribute_name = "*";;
+    }
+    | ID {
       $$ = new RelAttrSqlNode;
       $$->attribute_name = $1;
       free($1);
