@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <string.h>
+#include <string>
 #include <sstream>
 #include <functional>
 #include <memory>
@@ -66,6 +67,20 @@ public:
   int operator()(const char *v1, const char *v2) const
   {
     switch (attr_type_) {
+      case DATES: {
+        // check whether the date is a valid date
+        std::string tmp_str;
+        char target = '-';
+        tmp_str.assign(v1);
+        auto it = std::find(tmp_str.begin(), tmp_str.end(), target);
+        if(it!=tmp_str.end()) return -1;
+        tmp_str.assign(v2);
+        it = std::find(tmp_str.begin(), tmp_str.end(), target);
+        if(it!=tmp_str.end()) return -1;
+
+        // perform comparation
+        return common::compare_int((void *)v1, (void *)v2);
+      } break;
       case INTS: {
         return common::compare_int((void *)v1, (void *)v2);
       } break;
