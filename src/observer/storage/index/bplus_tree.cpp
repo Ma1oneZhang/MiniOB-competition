@@ -800,7 +800,7 @@ RC BplusTreeHandler::create(const char *file_name, AttrType attr_type, int attr_
   disk_buffer_pool_ = bp;
 
   memcpy(&file_header_, pdata, sizeof(file_header_));
-  header_dirty_ = false;
+  header_dirty_ = true;
   bp->unpin_page(header_frame);
 
   mem_pool_item_ = make_unique<common::MemPoolItem>(file_name);
