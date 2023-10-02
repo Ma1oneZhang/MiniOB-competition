@@ -14,11 +14,10 @@ See the Mulan PSL v2 for more details. */
 
 #include "storage/index/bplus_tree_index.h"
 #include "common/log/log.h"
+#include "storage/common/meta_util.h"
+#include <unistd.h>
 
-BplusTreeIndex::~BplusTreeIndex() noexcept
-{
-  close();
-}
+BplusTreeIndex::~BplusTreeIndex() noexcept { close(); }
 
 RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
 {
@@ -110,19 +109,25 @@ IndexScanner *BplusTreeIndex::create_scanner(
   return index_scanner;
 }
 
-RC BplusTreeIndex::sync()
+RC BplusTreeIndex::sync() { return index_handler_.sync(); }
+
+RC BplusTreeIndex::drop(const char *base_dir, const char *table_name)
 {
-  return index_handler_.sync();
+  ASSERT(inited_, "The Index must be inited");
+  index_handler_.close();
+  auto table_index_file_ = table_index_file(base_dir, table_name, index_meta().name());
+  unlink(table_index_file_.c_str());
+  if (EEXIST == errno) {
+    LOG_ERROR("Failed to delete index file. %s, EEXIST, %s", table_index_file_.c_str(), strerror(errno));
+    return RC::FILE_CLOSE;
+  }
+  return RC::SUCCESS;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-BplusTreeIndexScanner::BplusTreeIndexScanner(BplusTreeHandler &tree_handler) : tree_scanner_(tree_handler)
-{}
+BplusTreeIndexScanner::BplusTreeIndexScanner(BplusTreeHandler &tree_handler) : tree_scanner_(tree_handler) {}
 
-BplusTreeIndexScanner::~BplusTreeIndexScanner() noexcept
-{
-  tree_scanner_.close();
-}
+BplusTreeIndexScanner::~BplusTreeIndexScanner() noexcept { tree_scanner_.close(); }
 
 RC BplusTreeIndexScanner::open(
     const char *left_key, int left_len, bool left_inclusive, const char *right_key, int right_len, bool right_inclusive)
@@ -130,10 +135,7 @@ RC BplusTreeIndexScanner::open(
   return tree_scanner_.open(left_key, left_len, left_inclusive, right_key, right_len, right_inclusive);
 }
 
-RC BplusTreeIndexScanner::next_entry(RID *rid)
-{
-  return tree_scanner_.next_entry(*rid);
-}
+RC BplusTreeIndexScanner::next_entry(RID *rid) { return tree_scanner_.next_entry(*rid); }
 
 RC BplusTreeIndexScanner::destroy()
 {
