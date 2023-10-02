@@ -19,7 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/comparator.h"
 #include "common/lang/string.h"
 
-const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "floats", "booleans"};
+const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "dates", "floats", "booleans"};
 
 const char *attr_type_to_string(AttrType type)
 {
@@ -55,7 +55,10 @@ Value::Value(bool val)
 
 Value::Value(const char *s, int len /*= 0*/)
 {
-  set_string(s, len);
+  if(!set_date(s))
+  {
+    set_string(s, len);
+  }
 }
 
 void Value::set_data(char *data, int length)
@@ -75,6 +78,9 @@ void Value::set_data(char *data, int length)
     case BOOLEANS: {
       num_value_.bool_value_ = *(int *)data != 0;
       length_ = length;
+    } break;
+    case DATES: {
+      num_value_.date_value_ = *(int *)data;
     } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
@@ -110,6 +116,34 @@ void Value::set_string(const char *s, int len /*= 0*/)
     str_value_.assign(s);
   }
   length_ = str_value_.length();
+}
+
+bool check_date(int y, int m, int d)
+{
+  static int mon[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    bool leap = (y%400==0 || (y%100 && y%4==0));
+    return y > 0
+        && (m > 0)&&(m <= 12)
+        && (d > 0)&&(d <= ((m==2 && leap)?1:0) + mon[m]);
+}
+
+bool Value::set_date(const char *s)
+{
+  attr_type_ = DATES;
+  int y,m,d;
+  int result = sscanf(s, "%d-%d-%d", &y, &m, &d);
+  
+  if(result==3){  // matched successfully
+    bool b = check_date(y,m,d);
+    if(!b) return 0;
+    int val = y*10000+m*100+d;
+    num_value_.date_value_ = val;
+    length_ = sizeof(val);
+    str_value_.assign("");
+    return 1;
+  }else{  // not a date, store as a string
+    return 0;
+  }
 }
 
 void Value::set_value(const Value &value)
@@ -161,6 +195,14 @@ std::string Value::to_string() const
     case CHARS: {
       os << str_value_;
     } break;
+    case DATES: {
+      int y = num_value_.date_value_/10000;
+      int m = (num_value_.date_value_%10000)/100;
+      int d = num_value_.date_value_%100;
+      char date_str[12];
+      sprintf(date_str, "%04d-%02d-%02d", y, m, d);
+      os << date_str;
+    }
     default: {
       LOG_WARN("unsupported attr type: %d", attr_type_);
     } break;
@@ -172,6 +214,7 @@ int Value::compare(const Value &other) const
 {
   if (this->attr_type_ == other.attr_type_) {
     switch (this->attr_type_) {
+      case DATES:
       case INTS: {
         return common::compare_int((void *)&this->num_value_.int_value_, (void *)&other.num_value_.int_value_);
       } break;
