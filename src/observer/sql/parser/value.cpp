@@ -38,25 +38,15 @@ AttrType attr_type_from_string(const char *s)
   return UNDEFINED;
 }
 
-Value::Value(int val)
-{
-  set_int(val);
-}
+Value::Value(int val) { set_int(val); }
 
-Value::Value(float val)
-{
-  set_float(val);
-}
+Value::Value(float val) { set_float(val); }
 
-Value::Value(bool val)
-{
-  set_boolean(val);
-}
+Value::Value(bool val) { set_boolean(val); }
 
 Value::Value(const char *s, int len /*= 0*/)
 {
-  if(!set_date(s))
-  {
+  if (!set_date(s)) {
     set_string(s, len);
   }
 }
@@ -69,15 +59,15 @@ void Value::set_data(char *data, int length)
     } break;
     case INTS: {
       num_value_.int_value_ = *(int *)data;
-      length_ = length;
+      length_               = length;
     } break;
     case FLOATS: {
       num_value_.float_value_ = *(float *)data;
-      length_ = length;
+      length_                 = length;
     } break;
     case BOOLEANS: {
       num_value_.bool_value_ = *(int *)data != 0;
-      length_ = length;
+      length_                = length;
     } break;
     case DATES: {
       num_value_.date_value_ = *(int *)data;
@@ -89,22 +79,22 @@ void Value::set_data(char *data, int length)
 }
 void Value::set_int(int val)
 {
-  attr_type_ = INTS;
+  attr_type_            = INTS;
   num_value_.int_value_ = val;
-  length_ = sizeof(val);
+  length_               = sizeof(val);
 }
 
 void Value::set_float(float val)
 {
-  attr_type_ = FLOATS;
+  attr_type_              = FLOATS;
   num_value_.float_value_ = val;
-  length_ = sizeof(val);
+  length_                 = sizeof(val);
 }
 void Value::set_boolean(bool val)
 {
-  attr_type_ = BOOLEANS;
+  attr_type_             = BOOLEANS;
   num_value_.bool_value_ = val;
-  length_ = sizeof(val);
+  length_                = sizeof(val);
 }
 void Value::set_string(const char *s, int len /*= 0*/)
 {
@@ -121,27 +111,26 @@ void Value::set_string(const char *s, int len /*= 0*/)
 bool check_date(int y, int m, int d)
 {
   static int mon[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    bool leap = (y%400==0 || (y%100 && y%4==0));
-    return y > 0
-        && (m > 0)&&(m <= 12)
-        && (d > 0)&&(d <= ((m==2 && leap)?1:0) + mon[m]);
+  bool       leap  = (y % 400 == 0 || (y % 100 && y % 4 == 0));
+  return y > 0 && (m > 0) && (m <= 12) && (d > 0) && (d <= ((m == 2 && leap) ? 1 : 0) + mon[m]);
 }
 
 bool Value::set_date(const char *s)
 {
   attr_type_ = DATES;
-  int y,m,d;
+  int y, m, d;
   int result = sscanf(s, "%d-%d-%d", &y, &m, &d);
-  
-  if(result==3){  // matched successfully
-    bool b = check_date(y,m,d);
-    if(!b) return 0;
-    int val = y*10000+m*100+d;
+
+  if (result == 3) {  // matched successfully
+    bool b = check_date(y, m, d);
+    if (!b)
+      return 0;
+    int val                = y * 10000 + m * 100 + d;
     num_value_.date_value_ = val;
-    length_ = sizeof(val);
+    length_                = sizeof(val);
     str_value_.assign("");
     return 1;
-  }else{  // not a date, store as a string
+  } else {  // not a date, store as a string
     return 0;
   }
 }
@@ -161,7 +150,8 @@ void Value::set_value(const Value &value)
     case BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
-    case UNDEFINED: {
+    case UNDEFINED:
+    case DATES: {
       ASSERT(false, "got an invalid value type");
     } break;
   }
@@ -196,9 +186,9 @@ std::string Value::to_string() const
       os << str_value_;
     } break;
     case DATES: {
-      int y = num_value_.date_value_/10000;
-      int m = (num_value_.date_value_%10000)/100;
-      int d = num_value_.date_value_%100;
+      int  y = num_value_.date_value_ / 10000;
+      int  m = (num_value_.date_value_ % 10000) / 100;
+      int  d = num_value_.date_value_ % 100;
       char date_str[12];
       sprintf(date_str, "%04d-%02d-%02d", y, m, d);
       os << date_str;
@@ -301,10 +291,7 @@ float Value::get_float() const
   return 0;
 }
 
-std::string Value::get_string() const
-{
-  return this->to_string();
-}
+std::string Value::get_string() const { return this->to_string(); }
 
 bool Value::get_boolean() const
 {
