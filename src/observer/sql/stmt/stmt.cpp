@@ -33,6 +33,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/load_data_stmt.h"
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/update_stmt.h"
+#include "sql/stmt/show_index_stmt.h"
 
 RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
 {
@@ -74,6 +75,9 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
     }
     case SCF_SHOW_TABLES: {
       return ShowTablesStmt::create(db, stmt);
+    }
+    case SCF_SHOW_INDEX: {
+      return ShowIndexStmt::create(db, sql_node.show_index, stmt);
     }
     case SCF_BEGIN: {
       return TrxBeginStmt::create(stmt);
