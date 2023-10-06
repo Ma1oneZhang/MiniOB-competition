@@ -77,6 +77,8 @@ public:
   RC delete_record(const Record &record);
   RC visit_record(const RID &rid, bool readonly, std::function<void(Record &)> visitor);
   RC get_record(const RID &rid, Record &record);
+  // we choose in-place update
+  RC update_record(Record &old_record, Record &new_record);
 
   RC recover_insert_record(Record &record);
 
