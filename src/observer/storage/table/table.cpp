@@ -22,6 +22,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/defs.h"
 #include "storage/table/table.h"
 #include "common/rc.h"
+#include "storage/field/field_meta.h"
 #include "storage/table/table_meta.h"
 #include "common/log/log.h"
 #include "common/lang/string.h"
@@ -574,5 +575,16 @@ RC Table::sync()
     }
   }
   LOG_INFO("Sync table over. table=%s", name());
+  return rc;
+}
+
+RC Table::update_record(Record &old_record, Record &new_record)
+{
+  delete_record(old_record);
+  auto rc = insert_record(new_record);
+  if (rc != RC::SUCCESS) {
+    delete_record(new_record);
+    insert_record(old_record);
+  }
   return rc;
 }

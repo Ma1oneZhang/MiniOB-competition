@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "storage/record/record.h"
 #include "storage/trx/trx.h"
 
 /**
@@ -22,15 +23,15 @@ See the Mulan PSL v2 for more details. */
 class VacuousTrxKit : public TrxKit
 {
 public:
-  VacuousTrxKit() = default;
+  VacuousTrxKit()          = default;
   virtual ~VacuousTrxKit() = default;
 
-  RC init() override;
+  RC                            init() override;
   const std::vector<FieldMeta> *trx_fields() const override;
-  Trx *create_trx(CLogManager *log_manager) override;
-  Trx *create_trx(int32_t trx_id) override;
-  Trx *find_trx(int32_t trx_id) override;
-  void all_trxes(std::vector<Trx *> &trxes) override;
+  Trx                          *create_trx(CLogManager *log_manager) override;
+  Trx                          *create_trx(int32_t trx_id) override;
+  Trx                          *find_trx(int32_t trx_id) override;
+  void                          all_trxes(std::vector<Trx *> &trxes) override;
 
   void destroy_trx(Trx *trx) override;
 };
@@ -38,12 +39,14 @@ public:
 class VacuousTrx : public Trx
 {
 public:
-  VacuousTrx() = default;
+  VacuousTrx()          = default;
   virtual ~VacuousTrx() = default;
 
   RC insert_record(Table *table, Record &record) override;
   RC delete_record(Table *table, Record &record) override;
   RC visit_record(Table *table, Record &record, bool readonly) override;
+  RC update_record(Table *table, Record &old_record, Record &new_record) override;
+
   RC start_if_need() override;
   RC commit() override;
   RC rollback() override;
