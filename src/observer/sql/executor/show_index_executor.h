@@ -23,6 +23,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/show_index_stmt.h"
 #include "storage/db/db.h"
 #include "storage/index/index.h"
+#include <cctype>
 
 /**
  * @brief 显示所有表的执行器
@@ -55,14 +56,18 @@ public:
     tuple_schema.append_cell(TupleCellSpec("", "Column_name", "Column_name"));
     sql_result->set_tuple_schema(tuple_schema);
 
-    auto oper = new StringListPhysicalOperator;
+    auto oper          = new StringListPhysicalOperator;
+    auto to_upper_case = [](string str) {
+      std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+      return str;
+    };
     for (int i = 0; i < table->table_meta().index_num(); i++) {
       auto index_meta = table->table_meta().index(i);
-      oper->append({std::string(table->table_meta().name()), // Table
-          std::to_string(1), // Non_unique
-          index_meta->name(), // Key_name
-          std::to_string(i + 1), // Seq_in_index
-          std::string(index_meta->field())}); // Column_name
+      oper->append({to_upper_case(std::string(table->table_meta().name())),  // Table
+          std::to_string(1),                                                 // Non_unique
+          to_upper_case(index_meta->name()),                                 // Key_name
+          std::to_string(i + 1),                                             // Seq_in_index
+          to_upper_case(std::string(index_meta->field()))});                 // Column_name
     }
 
     sql_result->set_operator(std::unique_ptr<PhysicalOperator>(oper));
