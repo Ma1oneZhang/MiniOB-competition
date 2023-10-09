@@ -18,6 +18,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/clog/clog.h"
 #include "storage/db/db.h"
 #include "storage/clog/clog.h"
+#include "storage/record/record.h"
+#include "storage/table/table.h"
 
 using namespace std;
 
@@ -152,6 +154,20 @@ RC MvccTrx::insert_record(Table *table, Record &record)
   return rc;
 }
 
+RC MvccTrx::insert_records(Table *table, std::vector<Record> &records)
+{
+  // unimplemetion for mvcc
+  for (size_t i = 0; i < records.size(); i++) {
+    auto rc = insert_record(table, records[i]);
+    if (rc != RC::SUCCESS) {
+      for (size_t j = i - 1; j >= 0; j--) {
+        delete_record(table, records[j]);
+      }
+      return rc;
+    }
+  }
+  return RC::SUCCESS;
+}
 RC MvccTrx::delete_record(Table *table, Record &record)
 {
   Field begin_field;

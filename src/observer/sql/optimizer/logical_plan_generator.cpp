@@ -36,6 +36,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/update_stmt.h"
 #include <memory>
 #include <utility>
+#include <vector>
 
 using namespace std;
 
@@ -163,10 +164,10 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
 
 RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  Table        *table = insert_stmt->table();
-  vector<Value> values(insert_stmt->values(), insert_stmt->values() + insert_stmt->value_amount());
+  Table                *table = insert_stmt->table();
+  vector<vector<Value>> values(*insert_stmt->values());
 
-  InsertLogicalOperator *insert_operator = new InsertLogicalOperator(table, values);
+  InsertLogicalOperator *insert_operator = new InsertLogicalOperator(table, std::move(values));
   logical_operator.reset(insert_operator);
   return RC::SUCCESS;
 }
@@ -218,10 +219,10 @@ RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<Logic
 
 RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  auto table       = update_stmt->table();
-  auto filter_stmt = update_stmt->filter();
-  auto attr_name   = update_stmt->attribute_name();
-  auto value = update_stmt->values();
+  auto               table       = update_stmt->table();
+  auto               filter_stmt = update_stmt->filter();
+  auto               attr_name   = update_stmt->attribute_name();
+  auto               value       = update_stmt->values();
   std::vector<Field> fields;
   // need optimize
   for (int i = table->table_meta().sys_field_num(); i < table->table_meta().field_num(); i++) {
