@@ -40,9 +40,9 @@ RC InsertPhysicalOperator::open(Trx *trx)
   auto rc = trx->insert_records(table_, records);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to insert record by transaction. rc=%s", strrc(rc));
+    return rc;
   }
-  // return rc;
-  return RC::UNIMPLENMENT;
+  return rc;
 }
 
 RC InsertPhysicalOperator::next() { return RC::RECORD_EOF; }
