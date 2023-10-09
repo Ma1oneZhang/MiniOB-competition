@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "storage/trx/vacuous_trx.h"
+#include "common/rc.h"
 #include "storage/record/record.h"
 
 using namespace std;
@@ -34,6 +35,20 @@ void VacuousTrxKit::all_trxes(std::vector<Trx *> &trxes) { return; }
 ////////////////////////////////////////////////////////////////////////////////
 
 RC VacuousTrx::insert_record(Table *table, Record &record) { return table->insert_record(record); }
+
+RC VacuousTrx::insert_records(Table *table, std::vector<Record> &records)
+{
+  for (size_t i = 0; i < records.size(); i++) {
+    auto rc = insert_record(table, records[i]);
+    if (rc != RC::SUCCESS) {
+      for (size_t j = i - 1; j >= 0; j--) {
+        delete_record(table, records[j]);
+      }
+      return rc;
+    }
+  }
+  return RC::SUCCESS;
+}
 
 RC VacuousTrx::delete_record(Table *table, Record &record) { return table->delete_record(record); }
 

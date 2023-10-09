@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "storage/record/record.h"
+#include "storage/table/table.h"
 #include "storage/trx/trx.h"
 
 /**
@@ -43,6 +44,7 @@ public:
   virtual ~VacuousTrx() = default;
 
   RC insert_record(Table *table, Record &record) override;
+  RC insert_records(Table *table, std::vector<Record> &records) override;
   RC delete_record(Table *table, Record &record) override;
   RC visit_record(Table *table, Record &record, bool readonly) override;
   RC update_record(Table *table, Record &old_record, Record &new_record) override;

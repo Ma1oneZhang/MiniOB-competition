@@ -140,6 +140,7 @@ public:
   virtual ~Trx() = default;
 
   virtual RC insert_record(Table *table, Record &record)                         = 0;
+  virtual RC insert_records(Table *table, std::vector<Record> &records)          = 0;
   virtual RC delete_record(Table *table, Record &record)                         = 0;
   virtual RC visit_record(Table *table, Record &record, bool readonly)           = 0;
   virtual RC update_record(Table *table, Record &old_record, Record &new_record) = 0;
