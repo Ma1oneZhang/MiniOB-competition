@@ -131,7 +131,7 @@ RC ComparisonExpr::like_operation(const Value &left, const Value &right, bool &r
     return RC::INTERNAL;
   }
   std::regex     reg;
-  constexpr auto alias_of_single_char_wildcard = "[^']?{1}";
+  constexpr auto alias_of_single_char_wildcard = "[^']{1}";
   constexpr auto alias_of_chars_wildcard       = "[^']*";
   std::string    pattern{};
 
