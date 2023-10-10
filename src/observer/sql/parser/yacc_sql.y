@@ -85,6 +85,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         VALUES
         FROM
         WHERE
+        LIKE
+        NOT
         AND
         SET
         ON
@@ -671,6 +673,24 @@ condition:
 
       delete $1;
       delete $3;
+    }
+    | rel_attr LIKE value
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 1;
+      $$->left_attr = *$1;
+      $$->right_is_attr = 0;
+      $$->right_value = *$3;
+      $$->comp = CompOp::LIKE_OP;
+    }
+    | rel_attr NOT LIKE value
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 1;
+      $$->left_attr = *$1;
+      $$->right_is_attr = 0;
+      $$->right_value = *$4;
+      $$->comp = CompOp::NOT_LIKE_OP;
     }
     ;
 

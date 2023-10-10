@@ -52,6 +52,8 @@ enum CompOp
   LESS_THAN,    ///< "<"
   GREAT_EQUAL,  ///< ">="
   GREAT_THAN,   ///< ">"
+  LIKE_OP,      ///< "LIKE operation"
+  NOT_LIKE_OP,  ///< "NOT LIKE operation"
   NO_OP
 };
 
@@ -112,7 +114,7 @@ struct CalcSqlNode
  */
 struct InsertSqlNode
 {
-  std::string        relation_name;  ///< Relation to insert into
+  std::string                     relation_name;  ///< Relation to insert into
   std::vector<std::vector<Value>> values;         ///< 要插入的值
 };
 
