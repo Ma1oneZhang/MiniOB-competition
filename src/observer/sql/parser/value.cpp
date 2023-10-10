@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include <sstream>
+#include <cmath>
 #include "sql/parser/value.h"
 #include "storage/field/field.h"
 #include "common/log/log.h"
@@ -230,10 +231,69 @@ int Value::compare(const Value &other) const
   } else if (this->attr_type_ == INTS && other.attr_type_ == FLOATS) {
     float this_data = this->num_value_.int_value_;
     return common::compare_float((void *)&this_data, (void *)&other.num_value_.float_value_);
+  } else if (this->attr_type_ == INTS && other.attr_type_ == CHARS) {
+    float this_data = this->num_value_.int_value_;
+    const char *c_str = other.data();
+    float       other_data = 0, digit_val_ = 0;
+    int         integer_val = 0, digit_val = 0;
+    int         prefixNum = returnPrefixNum(c_str, integer_val);
+    if (prefixNum > 0 && c_str[prefixNum] == '.') {
+      returnPrefixNum(c_str + prefixNum + 1, digit_val);
+      digit_val_ = digit_val;
+      while (digit_val_ >= 1) {
+        digit_val_ /= 10;
+      }
+    }
+    other_data = integer_val + digit_val_;
+    return common::compare_float((void *)&this_data, (void *)&other_data);
   } else if (this->attr_type_ == FLOATS && other.attr_type_ == INTS) {
     float other_data = other.num_value_.int_value_;
     return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
+  } else if (this->attr_type_ == FLOATS && other.attr_type_ == CHARS) {
+    const char *c_str = other.data();
+    float       other_data = 0, digit_val_ = 0;
+    int         integer_val = 0, digit_val = 0;
+    int         prefixNum = returnPrefixNum(c_str, integer_val);
+    if (prefixNum > 0 && c_str[prefixNum] == '.') {
+      returnPrefixNum(c_str + prefixNum + 1, digit_val);
+      digit_val_ = digit_val;
+      while (digit_val_ >= 1) {
+        digit_val_ /= 10;
+      }
+    }
+    other_data = integer_val + digit_val_;
+    return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
+  } else if (this->attr_type_ == CHARS && other.attr_type_ == INTS) {
+    const char *c_str = this->data();
+    float       this_data = 0, digit_val_ = 0;
+    int         integer_val = 0, digit_val = 0;
+    int         prefixNum = returnPrefixNum(c_str, integer_val);
+    if (prefixNum > 0 && c_str[prefixNum] == '.') {
+      returnPrefixNum(c_str + prefixNum + 1, digit_val);
+      digit_val_ = digit_val;
+      while (digit_val_ >= 1) {
+        digit_val_ /= 10;
+      }
+    }
+    this_data = integer_val + digit_val_;
+    float other_data = other.num_value_.int_value_;
+    return common::compare_float((void*)&this_data, (void *)&other_data);
+  } else if (this->attr_type_ == CHARS && other.attr_type_ == FLOATS) {
+    const char *c_str = this->data();
+    float       this_data = 0, digit_val_ = 0;
+    int         integer_val = 0, digit_val = 0;
+    int         prefixNum = returnPrefixNum(c_str, integer_val);
+    if (prefixNum > 0 && c_str[prefixNum] == '.') {
+      returnPrefixNum(c_str + prefixNum + 1, digit_val);
+      digit_val_ = digit_val;
+      while (digit_val_ >= 1) {
+        digit_val_ /= 10;
+      }
+    }
+    this_data = integer_val + digit_val_;
+    return common::compare_float((void *)&this_data, (void *)&other.num_value_.float_value_);
   }
+  
   LOG_WARN("not supported");
   return -1;  // TODO return rc?
 }
@@ -333,4 +393,117 @@ bool Value::get_boolean() const
     }
   }
   return false;
+}
+
+int returnPrefixNum(const char *str, int &val)
+{
+  if (str == NULL || *str == '\0') {
+    // Handle empty string or NULL pointer as needed.
+    return 0;  // Not a number.
+  }
+
+  // Iterate through characters in the string until a non-digit character is found.
+  int prefixNum = 0;
+  val           = 0;
+  while (*str != '\0') {
+    if (!isdigit(*str)) {
+      // If a non-digit character is encountered, it's not a number.
+      break;
+    }
+    val = val * 10 + (*str - '0');
+    str++;  // Move to the next character.
+    prefixNum++;
+  }
+
+  return prefixNum;
+}
+
+bool Value::match_field_type(AttrType field_type)
+{
+  // the field type and attribute type are the same
+  if (attr_type_ == field_type) {
+    return true;
+  }
+
+  /*
+   * the two types are not the same, then attempt to
+   * convert attr to the type of field
+   */
+  switch (field_type) {
+    case AttrType::CHARS:
+      switch (attr_type_) {
+        // int to string
+        case AttrType::INTS: {
+          char val[20];
+          sprintf(val, "%d", get_int());
+          set_string(val);
+          break;
+        }
+        // float to string
+        case AttrType::FLOATS: {
+          int char_len = 1;
+          float float_val = get_float();
+          int integer_part = (int)float_val;
+          float fraction_part = float_val - integer_part;
+          while(integer_part>=1){
+            integer_part /= 10;
+            char_len ++;
+          }
+          while(fraction_part!=0){
+            fraction_part *= 10;
+            fraction_part = fraction_part - (int)fraction_part;
+            char_len++;
+          }
+          char val[char_len];
+          sprintf(val, "%f", float_val);
+          set_string(val,char_len);
+          break;
+        }
+      }
+      /* code */
+      break;
+    case AttrType::INTS: {
+      switch (attr_type_) {
+        // string to int
+        case AttrType::CHARS: {
+          int val = 0;
+          returnPrefixNum(data(), val);
+          set_int(val);
+          break;
+        }
+        // float to int
+        case AttrType::FLOATS: set_int((int)round(get_float())); break;
+      }
+      break;
+    }
+    case AttrType::FLOATS:
+      switch (attr_type_) {
+        // string to floats
+        case AttrType::CHARS: {
+          const char *c_str = data();
+          float       val = 0, digit_val_ = 0;
+          int         integer_val = 0, digit_val = 0;
+          int         prefixNum = returnPrefixNum(c_str, integer_val);
+          if (prefixNum > 0 && c_str[prefixNum] == '.') {
+            returnPrefixNum(c_str + prefixNum + 1, digit_val);
+            digit_val_ = digit_val;
+            while (digit_val_ >= 1) {
+              digit_val_ /= 10;
+            }
+          }
+          val = integer_val + digit_val_;
+          set_float(val);
+          break;
+        }
+        case AttrType::INTS: set_float((float)get_int()); break;
+      }
+      break;
+    default:
+      // the coversion failed
+      return false;
+      break;
+  }
+
+  // the conversion successed
+  return true;
 }

@@ -32,6 +32,7 @@ enum AttrType
 
 const char *attr_type_to_string(AttrType type);
 AttrType attr_type_from_string(const char *s);
+int returnPrefixNum(const char *str, int &val);
 
 /**
  * @brief 属性的值
@@ -95,6 +96,7 @@ public:
   float get_float() const;
   std::string get_string() const;
   bool get_boolean() const;
+  bool match_field_type(AttrType field_type);
 
 private:
   AttrType attr_type_ = UNDEFINED;
