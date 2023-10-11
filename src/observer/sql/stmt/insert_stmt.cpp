@@ -16,10 +16,12 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
+#include <ctype.h>
+#include <cmath>
 
 InsertStmt::InsertStmt(Table *table, const std::vector<std::vector<Value>> *values) : table_(table), values_(values) {}
 
-RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
+RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
 {
   const char *table_name = inserts.relation_name.c_str();
   if (nullptr == db || nullptr == table_name || inserts.values.empty()) {
@@ -36,7 +38,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   }
 
   // check the fields number
-  const std::vector<std::vector<Value>> *values = &inserts.values;
+  std::vector<std::vector<Value>> *values = &inserts.values;
   for (auto &value : inserts.values) {
     const int        value_num  = static_cast<int>(value.size());
     const TableMeta &table_meta = table->table_meta();
@@ -52,9 +54,15 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
         const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
         const AttrType   field_type = field_meta->type();
         const AttrType   value_type = tuple[i].attr_type();
-        if (field_type != value_type) {  // TODO try to convert the value type to field type
+
+        // types of field and value match, continue to next field.
+        if (value_type == field_type){
+          continue;
+        }
+
+        if (!tuple[i].match_field_type(field_type)) {
           LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
-          table_name, field_meta->name(), field_type, value_type);
+                table_name, field_meta->name(), field_type, value_type);
           return RC::SCHEMA_FIELD_TYPE_MISMATCH;
         }
       }
