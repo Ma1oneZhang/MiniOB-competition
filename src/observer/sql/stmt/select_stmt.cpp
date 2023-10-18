@@ -47,7 +47,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   // collect tables in `from` statement
-  std::vector<Table *>                     tables;
+  std::set<Table *>                     tables;
   std::unordered_map<std::string, Table *> table_map;
   std::vector<ConditionSqlNode>            conditions = select_sql.conditions;
 
@@ -64,7 +64,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    tables.push_back(table);
+    tables.insert(table);
     table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
 
@@ -84,7 +84,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
           if (tables.size() != 1) {
             return RC::SCHEMA_FIELD_NOT_EXIST;
           }
-          query_fields.push_back(Field(tables[0], nullptr, AggregationType::COUNT));
+          query_fields.push_back(Field(*tables.begin(), nullptr, AggregationType::COUNT));
         }
       } else if (!common::is_blank(relation_attr.relation_name.c_str())) {
         const char *table_name = relation_attr.relation_name.c_str();
@@ -138,7 +138,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
           return RC::SCHEMA_FIELD_MISSING;
         }
 
-        Table           *table      = tables[0];
+        Table           *table      = *tables.begin();
         const FieldMeta *field_meta = table->table_meta().field(relation_attr.attribute_name.c_str());
         if (nullptr == field_meta) {
           LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), relation_attr.attribute_name.c_str());
@@ -163,7 +163,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
           return RC::SCHEMA_TABLE_NOT_EXIST;
         }
 
-        tables.push_back(table);
+        tables.insert(table);
         table_map.insert(std::pair<std::string, Table *>(table_name, table));
       }
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
@@ -209,7 +209,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
           return RC::SCHEMA_FIELD_MISSING;
         }
 
-        Table           *table      = tables[0];
+        Table           *table      = *tables.begin();
         const FieldMeta *field_meta = table->table_meta().field(relation_attr.attribute_name.c_str());
         if (nullptr == field_meta) {
           LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), relation_attr.attribute_name.c_str());
@@ -225,7 +225,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
 
   Table *default_table = nullptr;
   if (tables.size() == 1) {
-    default_table = tables[0];
+    default_table = *tables.begin();
   }
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
     std::vector<ConditionSqlNode> const &tmp_vec_condi = select_sql.joinctions[i].join_conditions;
@@ -244,7 +244,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
   // TODO add expression copy
-  select_stmt->tables_.swap(tables);
+  select_stmt->tables_ = std::vector<Table *>(tables.begin(), tables.end());
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   stmt                      = select_stmt;

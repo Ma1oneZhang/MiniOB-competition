@@ -175,19 +175,19 @@ const char *Value::data() const
 
 std::string Value::to_string() const
 {
-  std::stringstream os;
+  std::string res;
   switch (attr_type_) {
     case INTS: {
-      os << num_value_.int_value_;
+      res = std::to_string(num_value_.int_value_);
     } break;
     case FLOATS: {
-      os << common::double_to_str(num_value_.float_value_);
+      res = common::double_to_str(num_value_.float_value_);
     } break;
     case BOOLEANS: {
-      os << num_value_.bool_value_;
+      res = num_value_.bool_value_ == false ? "0" : "1";
     } break;
     case CHARS: {
-      os << str_value_;
+      res = str_value_;
     } break;
     case DATES: {
       int  y = num_value_.date_value_ / 10000;
@@ -195,13 +195,13 @@ std::string Value::to_string() const
       int  d = num_value_.date_value_ % 100;
       char date_str[12];
       sprintf(date_str, "%04d-%02d-%02d", y, m, d);
-      os << date_str;
+      res = date_str;
     } break;
     default: {
       LOG_WARN("unsupported attr type: %d", attr_type_);
     } break;
   }
-  return os.str();
+  return res;
 }
 
 int Value::compare(const Value &other) const

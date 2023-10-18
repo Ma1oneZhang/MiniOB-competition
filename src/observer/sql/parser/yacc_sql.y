@@ -670,9 +670,9 @@ aggr_list:
     ;
 
 join_node:
-    INNER JOIN rel_attr ON condition_list
+    INNER JOIN ID ON condition_list
     {
-      $$ = new JoinSqlNode{$3->attribute_name,*$5};
+      $$ = new JoinSqlNode{$3,*$5};
       delete $3;
       delete $5;
     }
