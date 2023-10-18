@@ -19,7 +19,7 @@ struct AggregationResult
 class AggregationPhysicalOperator : public PhysicalOperator
 {
 public:
-  AggregationPhysicalOperator(std::vector<Field> &fields) : fields_(fields) {}
+  AggregationPhysicalOperator(std::vector<Field> &fields) : fields_(fields), already_run_(false) {}
   virtual ~AggregationPhysicalOperator() = default;
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::AGGREGATION; }

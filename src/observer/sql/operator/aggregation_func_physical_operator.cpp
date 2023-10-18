@@ -24,6 +24,7 @@ RC AggregationPhysicalOperator::next()
   auto child = children_[0].get();
   result_.resize(fields_.size());
   while (RC::SUCCESS == (rc = child->next())) {
+    already_run_ = true;
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
       LOG_WARN("failed to get current record: %s", strrc(rc));
@@ -92,7 +93,9 @@ RC AggregationPhysicalOperator::next()
       }
     }
   }
-
+  if (!already_run_ && RC::RECORD_EOF == rc) {
+    return rc;
+  }
   // build a tuple
   auto tuple_ptr = new AggregationTuple;
 
@@ -131,8 +134,7 @@ RC AggregationPhysicalOperator::next()
   }
 
   tuple_ptr->set_cells(result);
-  current_tuple_     = tuple_ptr;
-  this->already_run_ = true;
+  current_tuple_ = tuple_ptr;
   return RC::SUCCESS;
 }
 

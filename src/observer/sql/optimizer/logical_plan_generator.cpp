@@ -89,9 +89,11 @@ RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<Logica
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   unique_ptr<LogicalOperator> table_oper(nullptr);
+  unique_ptr<LogicalOperator> aggregation_oper(nullptr);
 
   const std::vector<Table *> &tables     = select_stmt->tables();
   const std::vector<Field>   &all_fields = select_stmt->query_fields();
+
   for (Table *table : tables) {
     std::vector<Field> fields;
     for (const Field &field : all_fields) {
@@ -114,9 +116,11 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       }
     } else {
       // aggr func
-      unique_ptr<LogicalOperator> aggregation_oper(new AggregationLogicalOperator(table, fields));
-      aggregation_oper->add_child(std::move(table_get_oper));
-      table_oper.swap(aggregation_oper);
+      if (table_oper == nullptr) {
+        table_oper = std::move(table_get_oper);
+      }
+      unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(table, fields));
+      aggregation_oper.swap(aggr_oper);
     }
   }
 
@@ -128,14 +132,28 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
 
   unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(all_fields));
-  if (predicate_oper) {
-    if (table_oper) {
-      predicate_oper->add_child(std::move(table_oper));
+  if (!aggregation_oper) {
+    if (predicate_oper) {
+      if (table_oper) {
+        predicate_oper->add_child(std::move(table_oper));
+      }
+      project_oper->add_child(std::move(predicate_oper));
+    } else {
+      if (table_oper) {
+        project_oper->add_child(std::move(table_oper));
+      }
     }
-    project_oper->add_child(std::move(predicate_oper));
   } else {
-    if (table_oper) {
-      project_oper->add_child(std::move(table_oper));
+    if (predicate_oper) {
+      // must have table scan operation
+      if (table_oper) {
+        predicate_oper->add_child(std::move(table_oper));
+      }
+      aggregation_oper->add_child(std::move(predicate_oper));
+      project_oper->add_child(std::move(aggregation_oper));
+    } else {
+      aggregation_oper->add_child(std::move(table_oper));
+      project_oper->add_child(std::move(aggregation_oper));
     }
   }
 
