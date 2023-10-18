@@ -49,6 +49,8 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // collect tables in `from` statement
   std::vector<Table *>                     tables;
   std::unordered_map<std::string, Table *> table_map;
+  std::vector<ConditionSqlNode>            conditions = select_sql.conditions;
+
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
@@ -147,6 +149,23 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       }
     } else {
       // Have no aggregation function
+      // add the join's table to the tables
+      for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
+        const char *table_name = select_sql.joinctions[i].join_relation.c_str();
+        if (nullptr == table_name) {
+          LOG_WARN("invalid argument. join relation name is null. index=%d", i);
+          return RC::INVALID_ARGUMENT;
+        }
+
+        Table *table = db->find_table(table_name);
+        if (nullptr == table) {
+          LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+          return RC::SCHEMA_TABLE_NOT_EXIST;
+        }
+
+        tables.push_back(table);
+        table_map.insert(std::pair<std::string, Table *>(table_name, table));
+      }
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
           0 == strcmp(relation_attr.attribute_name.c_str(), "*")) {
         for (Table *table : tables) {
@@ -208,15 +227,15 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   if (tables.size() == 1) {
     default_table = tables[0];
   }
-
+  for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
+    std::vector<ConditionSqlNode> const &tmp_vec_condi = select_sql.joinctions[i].join_conditions;
+    for (auto j : tmp_vec_condi)
+      conditions.emplace_back(j);
+  }
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(db,
-      default_table,
-      &table_map,
-      select_sql.conditions.data(),
-      static_cast<int>(select_sql.conditions.size()),
-      filter_stmt);
+  RC          rc          = FilterStmt::create(
+      db, default_table, &table_map, conditions.data(), static_cast<int>(conditions.size()), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;

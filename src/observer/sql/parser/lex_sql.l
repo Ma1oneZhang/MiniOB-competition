@@ -102,6 +102,8 @@ SUM                                     RETURN_TOKEN(SUM);
 CALC                                    RETURN_TOKEN(CALC);
 FROM                                    RETURN_TOKEN(FROM);
 WHERE                                   RETURN_TOKEN(WHERE);
+INNER                                   RETURN_TOKEN(INNER);
+JOIN                                    RETURN_TOKEN(JOIN);
 LIKE                                    RETURN_TOKEN(LIKE);
 NOT                                     RETURN_TOKEN(NOT);
 AND                                     RETURN_TOKEN(AND);
