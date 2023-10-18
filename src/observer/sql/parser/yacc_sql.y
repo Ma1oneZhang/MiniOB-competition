@@ -69,6 +69,11 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         DELETE
         UPDATE
         LBRACE
+        MAX
+        MIN
+        COUNT
+        AVG
+        SUM
         RBRACE
         COMMA
         TRX_BEGIN
@@ -138,6 +143,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <number>              number
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
+%type <rel_attr>            aggr_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <value_list>          value_list
@@ -146,6 +152,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <condition_list>      condition_list
 %type <rel_attr_list>       select_attr
 %type <relation_list>       rel_list
+%type <rel_attr_list>       aggr_list
 %type <rel_attr_list>       attr_list
 %type <expression>          expression
 %type <expression_list>     expression_list
@@ -545,6 +552,15 @@ select_attr:
       $$->emplace_back(*$1);
       delete $1;
     }
+    | aggr_attr aggr_list {
+      if ($2 != nullptr) {
+        $$ = $2;
+      } else {
+        $$ = new std::vector<RelAttrSqlNode>;
+      }
+      $$->emplace_back(*$1);
+      delete $1;
+    }
     ;
 
 rel_attr:
@@ -598,6 +614,49 @@ rel_list:
 
       $$->push_back($2);
       free($2);
+    }
+    ;
+
+aggr_attr:
+    MIN LBRACE rel_attr RBRACE
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::MIN;
+    }
+    | MAX LBRACE rel_attr RBRACE
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::MAX;
+    }
+    | COUNT LBRACE rel_attr RBRACE 
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::COUNT;
+    }
+    | AVG LBRACE rel_attr RBRACE
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::AVG;
+    }
+    | SUM LBRACE rel_attr RBRACE
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::SUM;
+    }
+
+aggr_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA aggr_attr aggr_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<RelAttrSqlNode>;
+      }
+      $$->emplace_back(*$2);
+      delete $2;
     }
     ;
 where:
