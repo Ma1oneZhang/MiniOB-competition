@@ -69,6 +69,13 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         DELETE
         UPDATE
         LBRACE
+        MAX
+        MIN
+        COUNT
+        AVG
+        SUM
+        INNER
+        JOIN
         RBRACE
         COMMA
         TRX_BEGIN
@@ -112,12 +119,14 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
+  JoinSqlNode *                     join_node;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * tuple_list;
   std::vector<ConditionSqlNode> *   condition_list;
   std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<std::string> *        relation_list;
+  std::vector<JoinSqlNode> *        join_list;
   char *                            string;
   int                               number;
   float                             floats;
@@ -138,6 +147,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <number>              number
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
+%type <rel_attr>            aggr_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <value_list>          value_list
@@ -146,7 +156,10 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <condition_list>      condition_list
 %type <rel_attr_list>       select_attr
 %type <relation_list>       rel_list
+%type <rel_attr_list>       aggr_list
 %type <rel_attr_list>       attr_list
+%type <join_node>           join_node
+%type <join_list>           join_list
 %type <expression>          expression
 %type <expression_list>     expression_list
 %type <sql_node>            calc_stmt
@@ -461,7 +474,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where
+    SELECT select_attr FROM ID rel_list join_list where
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -474,10 +487,13 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
       $$->selection.relations.push_back($4);
       std::reverse($$->selection.relations.begin(), $$->selection.relations.end());
-
       if ($6 != nullptr) {
-        $$->selection.conditions.swap(*$6);
+        $$->selection.joinctions.swap(*$6);
         delete $6;
+      }
+      if ($7 != nullptr) {
+        $$->selection.conditions.swap(*$7);
+        delete $7;
       }
       free($4);
     }
@@ -545,6 +561,15 @@ select_attr:
       $$->emplace_back(*$1);
       delete $1;
     }
+    | aggr_attr aggr_list {
+      if ($2 != nullptr) {
+        $$ = $2;
+      } else {
+        $$ = new std::vector<RelAttrSqlNode>;
+      }
+      $$->emplace_back(*$1);
+      delete $1;
+    }
     ;
 
 rel_attr:
@@ -600,6 +625,78 @@ rel_list:
       free($2);
     }
     ;
+
+aggr_attr:
+    MIN LBRACE rel_attr RBRACE
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::MIN;
+    }
+    | MAX LBRACE rel_attr RBRACE
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::MAX;
+    }
+    | COUNT LBRACE rel_attr RBRACE 
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::COUNT;
+    }
+    | AVG LBRACE rel_attr RBRACE
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::AVG;
+    }
+    | SUM LBRACE rel_attr RBRACE
+    {
+      $$ = $3;
+      $$->aggregation_type = AggregationType::SUM;
+    }
+
+aggr_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA aggr_attr aggr_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<RelAttrSqlNode>;
+      }
+      $$->emplace_back(*$2);
+      delete $2;
+    }
+    ;
+
+join_node:
+    INNER JOIN ID ON condition_list
+    {
+      $$ = new JoinSqlNode{$3,*$5};
+      delete $3;
+      delete $5;
+    }
+    ;
+
+join_list:
+       /* empty */
+    {
+      $$ = nullptr;
+    }
+    | join_node
+    {
+      $$ = new std::vector<JoinSqlNode>{*$1};
+      delete $1;   
+    }
+    | join_list join_node
+    {
+      $$->emplace_back(*$2);
+      delete $2;
+
+    }
+    ;
+
+
 where:
     /* empty */
     {

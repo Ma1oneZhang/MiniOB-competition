@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/optimizer/logical_plan_generator.h"
 
+#include "sql/operator/aggregation_func_logical_operator.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/project_logical_operator.h"
@@ -26,6 +27,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/explain_logical_operator.h"
 #include "sql/operator/update_logical_operator.h"
 
+#include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/select_stmt.h"
@@ -87,25 +89,38 @@ RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<Logica
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   unique_ptr<LogicalOperator> table_oper(nullptr);
+  unique_ptr<LogicalOperator> aggregation_oper(nullptr);
 
   const std::vector<Table *> &tables     = select_stmt->tables();
   const std::vector<Field>   &all_fields = select_stmt->query_fields();
+
   for (Table *table : tables) {
     std::vector<Field> fields;
     for (const Field &field : all_fields) {
-      if (0 == strcmp(field.table_name(), table->name())) {
+      if (field.get_aggr_type() == AggregationType::COUNT) {
+        fields.push_back(field);
+      } else if (0 == strcmp(field.table_name(), table->name())) {
         fields.push_back(field);
       }
     }
-
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, true /*readonly*/));
-    if (table_oper == nullptr) {
-      table_oper = std::move(table_get_oper);
+    if (all_fields[0].get_aggr_type() == AggregationType::NONE) {
+      // plain
+      if (table_oper == nullptr) {
+        table_oper = std::move(table_get_oper);
+      } else {
+        JoinLogicalOperator *join_oper = new JoinLogicalOperator;
+        join_oper->add_child(std::move(table_oper));
+        join_oper->add_child(std::move(table_get_oper));
+        table_oper = unique_ptr<LogicalOperator>(join_oper);
+      }
     } else {
-      JoinLogicalOperator *join_oper = new JoinLogicalOperator;
-      join_oper->add_child(std::move(table_oper));
-      join_oper->add_child(std::move(table_get_oper));
-      table_oper = unique_ptr<LogicalOperator>(join_oper);
+      // aggr func
+      if (table_oper == nullptr) {
+        table_oper = std::move(table_get_oper);
+      }
+      unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(table, fields));
+      aggregation_oper.swap(aggr_oper);
     }
   }
 
@@ -117,14 +132,28 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
 
   unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(all_fields));
-  if (predicate_oper) {
-    if (table_oper) {
-      predicate_oper->add_child(std::move(table_oper));
+  if (!aggregation_oper) {
+    if (predicate_oper) {
+      if (table_oper) {
+        predicate_oper->add_child(std::move(table_oper));
+      }
+      project_oper->add_child(std::move(predicate_oper));
+    } else {
+      if (table_oper) {
+        project_oper->add_child(std::move(table_oper));
+      }
     }
-    project_oper->add_child(std::move(predicate_oper));
   } else {
-    if (table_oper) {
-      project_oper->add_child(std::move(table_oper));
+    if (predicate_oper) {
+      // must have table scan operation
+      if (table_oper) {
+        predicate_oper->add_child(std::move(table_oper));
+      }
+      aggregation_oper->add_child(std::move(predicate_oper));
+      project_oper->add_child(std::move(aggregation_oper));
+    } else {
+      aggregation_oper->add_child(std::move(table_oper));
+      project_oper->add_child(std::move(aggregation_oper));
     }
   }
 

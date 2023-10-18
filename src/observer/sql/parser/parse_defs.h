@@ -28,6 +28,20 @@ class Expression;
  */
 
 /**
+ * @brief 描述聚合函数的类别
+ * @ingroup SQLParser
+ */
+enum class AggregationType
+{
+  MAX,
+  MIN,
+  COUNT,
+  AVG,
+  SUM,
+  NONE
+};
+
+/**
  * @brief 描述一个属性
  * @ingroup SQLParser
  * @details 属性，或者说字段(column, field)
@@ -36,8 +50,9 @@ class Expression;
  */
 struct RelAttrSqlNode
 {
-  std::string relation_name;   ///< relation name (may be NULL) 表名
-  std::string attribute_name;  ///< attribute name              属性名
+  std::string     relation_name;                             ///< relation name (may be NULL) 表名
+  std::string     attribute_name;                            ///< attribute name              属性名
+  AggregationType aggregation_type = AggregationType::NONE;  // 聚合函数类型，默认为无
 };
 
 /**
@@ -79,6 +94,17 @@ struct ConditionSqlNode
 };
 
 /**
+ * @brief 描述一个Join语句
+ * @ingroup SQLParser
+ */
+struct JoinSqlNode
+{
+  std::string                   join_relation;
+  std::vector<ConditionSqlNode> join_conditions;
+};
+
+
+/**
  * @brief 描述一个select语句
  * @ingroup SQLParser
  * @details 一个正常的select语句描述起来比这个要复杂很多，这里做了简化。
@@ -94,6 +120,7 @@ struct SelectSqlNode
   std::vector<RelAttrSqlNode>   attributes;  ///< attributes in select clause
   std::vector<std::string>      relations;   ///< 查询的表
   std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
+  std::vector<JoinSqlNode>      joinctions;
 };
 
 /**

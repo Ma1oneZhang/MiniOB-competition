@@ -14,59 +14,78 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "common/log/log.h"
+#include "sql/parser/parse_defs.h"
 #include "storage/table/table.h"
 #include "storage/field/field_meta.h"
+#include <cassert>
 
 /**
  * @brief 字段
- * 
+ *
  */
-class Field 
+class Field
 {
 public:
   Field() = default;
-  Field(const Table *table, const FieldMeta *field) : table_(table), field_(field)
-  {}
+  Field(const Table *table, const FieldMeta *field, const AggregationType aggr = AggregationType::NONE)
+      : table_(table), field_(field), aggregation_(aggr)
+  {
+    if (aggr != AggregationType::NONE) {
+      if (field_ == nullptr) {
+        aggr_field_name_ = "*";
+      } else {
+        aggr_field_name_ = field_->name();
+      }
+      switch (aggregation_) {
+        case AggregationType::MAX: {
+          aggr_field_name_ = "MAX(" + aggr_field_name_ + ")";
+        } break;
+        case AggregationType::MIN: {
+          aggr_field_name_ = "MIN(" + aggr_field_name_ + ")";
+        } break;
+        case AggregationType::COUNT: {
+          aggr_field_name_ = "COUNT(" + aggr_field_name_ + ")";
+        } break;
+        case AggregationType::AVG: {
+          aggr_field_name_ = "AVG(" + aggr_field_name_ + ")";
+        } break;
+        case AggregationType::SUM: {
+          aggr_field_name_ = "SUM(" + aggr_field_name_ + ")";
+        } break;
+
+        case AggregationType::NONE: {
+          LOG_PANIC("WARN_AGGREGATION_TYPE");
+        } break;
+      }
+    }
+  }
   Field(const Field &) = default;
 
-  const Table *table() const
-  {
-    return table_;
-  }
-  const FieldMeta *meta() const
-  {
-    return field_;
-  }
+  const Table     *table() const { return table_; }
+  const FieldMeta *meta() const { return field_; }
 
-  AttrType attr_type() const
-  {
-    return field_->type();
-  }
+  AttrType attr_type() const { return field_->type(); }
 
-  const char *table_name() const
-  {
-    return table_->name();
-  }
+  const char *table_name() const { return table_->name(); }
   const char *field_name() const
   {
-    return field_->name();
+    return AggregationType::NONE == aggregation_ ? field_->name() : aggr_field_name_.c_str();
   }
 
-  void set_table(const Table *table)
-  {
-    this->table_ = table;
-  }
-  void set_field(const FieldMeta *field)
-  {
-    this->field_ = field;
-  }
-
+  void set_table(const Table *table) { this->table_ = table; }
+  void set_field(const FieldMeta *field) { this->field_ = field; }
   void set_int(Record &record, int value);
-  int  get_int(const Record &record);
+  void set_aggr_type(AggregationType type) { this->aggregation_ = type; }
+
+  AggregationType get_aggr_type() const { return aggregation_; }
+  int             get_int(const Record &record);
 
   const char *get_data(const Record &record);
 
 private:
-  const Table *table_ = nullptr;
+  const Table     *table_ = nullptr;
   const FieldMeta *field_ = nullptr;
+  std::string      aggr_field_name_;
+  AggregationType  aggregation_ = AggregationType::NONE;
 };

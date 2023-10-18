@@ -175,19 +175,19 @@ const char *Value::data() const
 
 std::string Value::to_string() const
 {
-  std::stringstream os;
+  std::string res;
   switch (attr_type_) {
     case INTS: {
-      os << num_value_.int_value_;
+      res = std::to_string(num_value_.int_value_);
     } break;
     case FLOATS: {
-      os << common::double_to_str(num_value_.float_value_);
+      res = common::double_to_str(num_value_.float_value_);
     } break;
     case BOOLEANS: {
-      os << num_value_.bool_value_;
+      res = num_value_.bool_value_ == false ? "0" : "1";
     } break;
     case CHARS: {
-      os << str_value_;
+      res = str_value_;
     } break;
     case DATES: {
       int  y = num_value_.date_value_ / 10000;
@@ -195,13 +195,13 @@ std::string Value::to_string() const
       int  d = num_value_.date_value_ % 100;
       char date_str[12];
       sprintf(date_str, "%04d-%02d-%02d", y, m, d);
-      os << date_str;
-    }
+      res = date_str;
+    } break;
     default: {
       LOG_WARN("unsupported attr type: %d", attr_type_);
     } break;
   }
-  return os.str();
+  return res;
 }
 
 int Value::compare(const Value &other) const
@@ -232,8 +232,8 @@ int Value::compare(const Value &other) const
     float this_data = this->num_value_.int_value_;
     return common::compare_float((void *)&this_data, (void *)&other.num_value_.float_value_);
   } else if (this->attr_type_ == INTS && other.attr_type_ == CHARS) {
-    float this_data = this->num_value_.int_value_;
-    const char *c_str = other.data();
+    float       this_data  = this->num_value_.int_value_;
+    const char *c_str      = other.data();
     float       other_data = 0, digit_val_ = 0;
     int         integer_val = 0, digit_val = 0;
     int         prefixNum = returnPrefixNum(c_str, integer_val);
@@ -250,7 +250,7 @@ int Value::compare(const Value &other) const
     float other_data = other.num_value_.int_value_;
     return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
   } else if (this->attr_type_ == FLOATS && other.attr_type_ == CHARS) {
-    const char *c_str = other.data();
+    const char *c_str      = other.data();
     float       other_data = 0, digit_val_ = 0;
     int         integer_val = 0, digit_val = 0;
     int         prefixNum = returnPrefixNum(c_str, integer_val);
@@ -264,7 +264,7 @@ int Value::compare(const Value &other) const
     other_data = integer_val + digit_val_;
     return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
   } else if (this->attr_type_ == CHARS && other.attr_type_ == INTS) {
-    const char *c_str = this->data();
+    const char *c_str     = this->data();
     float       this_data = 0, digit_val_ = 0;
     int         integer_val = 0, digit_val = 0;
     int         prefixNum = returnPrefixNum(c_str, integer_val);
@@ -275,11 +275,11 @@ int Value::compare(const Value &other) const
         digit_val_ /= 10;
       }
     }
-    this_data = integer_val + digit_val_;
+    this_data        = integer_val + digit_val_;
     float other_data = other.num_value_.int_value_;
-    return common::compare_float((void*)&this_data, (void *)&other_data);
+    return common::compare_float((void *)&this_data, (void *)&other_data);
   } else if (this->attr_type_ == CHARS && other.attr_type_ == FLOATS) {
-    const char *c_str = this->data();
+    const char *c_str     = this->data();
     float       this_data = 0, digit_val_ = 0;
     int         integer_val = 0, digit_val = 0;
     int         prefixNum = returnPrefixNum(c_str, integer_val);
@@ -293,7 +293,7 @@ int Value::compare(const Value &other) const
     this_data = integer_val + digit_val_;
     return common::compare_float((void *)&this_data, (void *)&other.num_value_.float_value_);
   }
-  
+
   LOG_WARN("not supported");
   return -1;  // TODO return rc?
 }
@@ -441,24 +441,27 @@ bool Value::match_field_type(AttrType field_type)
         }
         // float to string
         case AttrType::FLOATS: {
-          int char_len = 1;
-          float float_val = get_float();
-          int integer_part = (int)float_val;
+          int   char_len      = 1;
+          float float_val     = get_float();
+          int   integer_part  = (int)float_val;
           float fraction_part = float_val - integer_part;
-          while(integer_part>=1){
+          while (integer_part >= 1) {
             integer_part /= 10;
-            char_len ++;
+            char_len++;
           }
-          while(fraction_part!=0){
+          while (fraction_part != 0) {
             fraction_part *= 10;
             fraction_part = fraction_part - (int)fraction_part;
             char_len++;
           }
           char val[char_len];
           sprintf(val, "%f", float_val);
-          set_string(val,char_len);
+          set_string(val, char_len);
           break;
         }
+        default: {
+          LOG_WARN("WARN TYPE CONVERSTION");
+        } break;
       }
       /* code */
       break;
@@ -495,7 +498,12 @@ bool Value::match_field_type(AttrType field_type)
           set_float(val);
           break;
         }
-        case AttrType::INTS: set_float((float)get_int()); break;
+        case AttrType::INTS: {
+          set_float((float)get_int());
+        } break;
+        default: {
+          LOG_WARN("WARN TYPE CONVERSTION");
+        } break;
       }
       break;
     default:

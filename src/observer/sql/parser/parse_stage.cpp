@@ -30,9 +30,9 @@ using namespace common;
 RC ParseStage::handle_request(SQLStageEvent *sql_event)
 {
   RC rc = RC::SUCCESS;
-  
-  SqlResult *sql_result = sql_event->session_event()->sql_result();
-  const std::string &sql = sql_event->sql();
+
+  SqlResult         *sql_result = sql_event->session_event()->sql_result();
+  const std::string &sql        = sql_event->sql();
 
   ParsedSqlResult parsed_sql_result;
 
@@ -52,7 +52,11 @@ RC ParseStage::handle_request(SQLStageEvent *sql_event)
     // set error information to event
     rc = RC::SQL_SYNTAX;
     sql_result->set_return_code(rc);
-    sql_result->set_state_string("Failed to parse sql");
+    auto sql_copy = sql;
+    str_to_lower(sql_copy);
+    if (!(sql_copy.find("count") != sql.npos || sql_copy.find("max") != sql.npos || sql_copy.find("min") != sql.npos ||
+            sql_copy.find("avg") != sql.npos || sql_copy.find("sum") != sql.npos))
+      sql_result->set_state_string("Failed to parse sql");
     return rc;
   }
 
