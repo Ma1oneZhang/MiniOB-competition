@@ -250,7 +250,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
 {
   auto               table       = update_stmt->table();
   auto               filter_stmt = update_stmt->filter();
-  auto               attr_name   = update_stmt->attribute_name();
+  auto               attr_name   = update_stmt->attribute_names();
   auto               value       = update_stmt->values();
   std::vector<Field> fields;
   // need optimize
@@ -261,8 +261,9 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, false /*readonly*/));
 
   unique_ptr<LogicalOperator> predicate_oper;
-
-  RC rc = create_plan(filter_stmt, predicate_oper);
+  RC rc = RC::SUCCESS;
+  if (filter_stmt != nullptr)
+    rc = create_plan(filter_stmt, predicate_oper);
   if (rc != RC::SUCCESS) {
     return rc;
   }

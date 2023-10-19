@@ -120,6 +120,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
   JoinSqlNode *                     join_node;
+  UpdateValue *                     update_value;
+  std::vector<UpdateValue> *        update_value_list;
   std::vector<Expression *> *       expression_list;
   std::vector<Value> *              value_list;
   std::vector<std::vector<Value>> * tuple_list;
@@ -147,6 +149,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <number>              number
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
+%type <update_value>        update_attr
+%type <update_value_list>   update_attr_list
 %type <rel_attr>            aggr_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
@@ -459,20 +463,53 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    UPDATE ID SET update_attr update_attr_list where 
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
+      if($5 == nullptr){
+        $5 = new std::vector<UpdateValue>;
+      }
+      $5->push_back(*$4);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = *$6;
-      if ($7 != nullptr) {
-        $$->update.conditions.swap(*$7);
-        delete $7;
+      for(auto &value : *$5){
+        $$->update.attribute_name.push_back(value.attribute_name);
+      }
+      for(auto &value : *$5){
+        $$->update.value.push_back(value.value);
+      }
+      if ($6 != nullptr) {
+        $$->update.conditions.swap(*$6);
+        delete $6;
       }
       free($2);
       free($4);
+      free($5);
     }
     ;
+
+update_attr:
+    ID EQ value
+    {
+      $$ = new UpdateValue;
+      $$->attribute_name = $1;
+      $$->value = *$3;
+    }
+    ;
+
+update_attr_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA update_attr update_attr_list 
+    {
+      if ($3 == nullptr){
+        $$ = new std::vector<UpdateValue>;
+      }else {
+        $$ = $3;
+      }
+      $$->push_back(*$2);
+    };
 select_stmt:        /*  select 语句的语法解析树*/
     SELECT select_attr FROM ID rel_list join_list where
     {

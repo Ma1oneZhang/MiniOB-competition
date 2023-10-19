@@ -65,7 +65,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     }
 
     tables.insert(table);
-    table_map.insert(std::pair<std::string, Table *>(table_name, table));
+    table_map.insert({table_name, table});
   }
 
   // collect query fields in `select` statement
