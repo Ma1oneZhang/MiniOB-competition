@@ -14,7 +14,6 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/stmt/select_stmt.h"
 #include "sql/parser/parse_defs.h"
-#include "sql/parser/value.h"
 #include "sql/stmt/filter_stmt.h"
 #include "common/log/log.h"
 #include "common/lang/string.h"
@@ -47,32 +46,33 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   // collect tables in `from` statement
-  std::set<Table *>                     tables;
+  std::vector<Table *>                     tables;
   std::unordered_map<std::string, Table *> table_map;
   std::vector<ConditionSqlNode>            conditions = select_sql.conditions;
 
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
-    if (nullptr == table_name) {
+    auto &table_name = select_sql.relations[i];
+    if ("" == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
     }
 
-    Table *table = db->find_table(table_name);
+    Table *table = db->find_table(table_name.c_str());
     if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name.c_str());
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    tables.insert(table);
-    table_map.insert({table_name, table});
+    if (std::find(tables.begin(), tables.end(), table) == tables.end()) {
+      tables.emplace_back(table);
+    }
+    table_map[table_name] = table;
   }
 
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
   for (int i = static_cast<int>(select_sql.attributes.size()) - 1; i >= 0; i--) {
     const RelAttrSqlNode &relation_attr = select_sql.attributes[i];
-
     if (relation_attr.aggregation_type != AggregationType::NONE) {
       // aggregation function
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
@@ -151,20 +151,22 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       // Have no aggregation function
       // add the join's table to the tables
       for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
-        const char *table_name = select_sql.joinctions[i].join_relation.c_str();
-        if (nullptr == table_name) {
+        auto &table_name = select_sql.joinctions[i].join_relation;
+        if ("" == table_name) {
           LOG_WARN("invalid argument. join relation name is null. index=%d", i);
           return RC::INVALID_ARGUMENT;
         }
 
-        Table *table = db->find_table(table_name);
+        Table *table = db->find_table(table_name.c_str());
         if (nullptr == table) {
-          LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+          LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name.c_str());
           return RC::SCHEMA_TABLE_NOT_EXIST;
         }
 
-        tables.insert(table);
-        table_map.insert(std::pair<std::string, Table *>(table_name, table));
+        if (std::find(tables.begin(), tables.end(), table) == tables.end()) {
+          tables.emplace_back(table);
+        }
+        table_map[table_name] = table;
       }
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
           0 == strcmp(relation_attr.attribute_name.c_str(), "*")) {
@@ -229,13 +231,14 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   }
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
     std::vector<ConditionSqlNode> const &tmp_vec_condi = select_sql.joinctions[i].join_conditions;
-    for (auto j : tmp_vec_condi)
+    for (auto &j : tmp_vec_condi)
       conditions.emplace_back(j);
   }
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
   RC          rc          = FilterStmt::create(
       db, default_table, &table_map, conditions.data(), static_cast<int>(conditions.size()), filter_stmt);
+
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -248,5 +251,6 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   stmt                      = select_stmt;
+
   return RC::SUCCESS;
 }
