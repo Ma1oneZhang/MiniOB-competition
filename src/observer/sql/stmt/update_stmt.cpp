@@ -34,12 +34,12 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
   auto fields = table->table_meta().field_metas();
-  for (size_t i = 1; i < update.attribute_name.size(); i++) {
+  for (size_t i = 0; i < update.attribute_name.size(); i++) {
     auto &field = update.attribute_name[i];
     auto &value = update.value[i];
     bool  match = false;
     for (auto iter = fields->begin(); iter != fields->end(); iter++) {
-      if (iter->name() == field) {
+      if (field == iter->name()) {
         if (iter->type() == value.attr_type()) {
           // we only need match one of field
           match = true;
