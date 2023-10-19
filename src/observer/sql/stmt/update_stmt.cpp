@@ -28,7 +28,6 @@ UpdateStmt::UpdateStmt(
 
 RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
 {
-  // TODO
   auto table = db->find_table(update.relation_name.c_str());
   if (table == nullptr) {
     return RC::SCHEMA_TABLE_NOT_EXIST;
@@ -55,7 +54,10 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
   FilterStmt *filter = nullptr;
   if (update.conditions.size() != 0) {
-    FilterStmt::create(db, table, nullptr, update.conditions.data(), update.conditions.size(), filter);
+    auto rc = FilterStmt::create(db, table, nullptr, update.conditions.data(), update.conditions.size(), filter);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
   }
   stmt = new UpdateStmt(table,
       const_cast<Value *>(update.value.data()),
