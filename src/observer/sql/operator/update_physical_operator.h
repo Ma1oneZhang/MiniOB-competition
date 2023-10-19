@@ -9,8 +9,8 @@ class UpdateStmt;
 class UpdatePhysicalOperator : public PhysicalOperator
 {
 public:
-  UpdatePhysicalOperator(Table *table, const char *attribute_name, Value *values, int value_amount)
-      : table_(table), attribute_name_(attribute_name), values_(values), value_amount_(value_amount)
+  UpdatePhysicalOperator(Table *table, std::vector<std::string> *attribute_names, Value *values, int value_amount)
+      : table_(table), attribute_names_(attribute_names), values_(values), value_amount_(value_amount)
   {}
   virtual ~UpdatePhysicalOperator() = default;
   PhysicalOperatorType type() const override { return PhysicalOperatorType::UPDATE; }
@@ -22,9 +22,9 @@ public:
   Tuple *current_tuple() override { return nullptr; }
 
 private:
-  Table      *table_          = nullptr;
-  Trx        *trx_            = nullptr;
-  const char *attribute_name_ = nullptr;
-  Value      *values_         = nullptr;
-  int         value_amount_   = 0;
+  Table                    *table_           = nullptr;
+  Trx                      *trx_             = nullptr;
+  std::vector<std::string> *attribute_names_ = nullptr;
+  Value                    *values_          = nullptr;
+  int                       value_amount_    = 0;
 };

@@ -29,7 +29,8 @@ class UpdateStmt : public Stmt
 {
 public:
   // UpdateStmt() = default;
-  UpdateStmt(Table *table, Value *values, FilterStmt *filter, const char *attribute_name, int value_amount = 1);
+  UpdateStmt(Table *table, Value *values, FilterStmt *filter, std::vector<std::string> *attribute_names_,
+      int value_amount = 1);
   ~UpdateStmt() override = default;
 
   virtual StmtType type() const override { return StmtType::UPDATE; }
@@ -38,16 +39,18 @@ public:
   static RC create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt);
 
 public:
-  Table      *table() const { return table_; }
-  Value      *values() const { return values_; }
-  int         value_amount() const { return value_amount_; }
-  FilterStmt *filter() const { return filter_; }
-  const char *attribute_name() { return attribute_name_; }
+  Table                    *table() const { return table_; }
+  Value                    *values() const { return values_; }
+  Value                    &value_at(size_t i) const { return values_[i]; }
+  int                       value_amount() const { return value_amount_; }
+  const char               *attribute_name(size_t i) { return attribute_names_->at(i).c_str(); }
+  std::vector<std::string> *attribute_names() { return attribute_names_; }
+  FilterStmt               *filter() const { return filter_; }
 
 private:
-  Table      *table_          = nullptr;
-  const char *attribute_name_ = nullptr;
-  FilterStmt *filter_         = nullptr;
-  Value      *values_         = nullptr;
-  int         value_amount_   = 0;
+  Table                    *table_           = nullptr;
+  std::vector<std::string> *attribute_names_ = {};
+  FilterStmt               *filter_          = nullptr;
+  Value                    *values_          = nullptr;
+  int                       value_amount_    = 0;
 };

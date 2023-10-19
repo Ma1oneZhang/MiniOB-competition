@@ -28,14 +28,8 @@ RC UpdatePhysicalOperator::next()
     return RC::RECORD_EOF;
   }
   PhysicalOperator *child = children_.front().get();
-
-  // find offset
-  auto field       = table_->table_meta().field(attribute_name_);
-  auto attr_len    = field->len();
-  auto attr_offset = field->offset();
-  ASSERT(attr_len == values_[0].length(), "The data type must have same length");
-
   while (RC::SUCCESS == (rc = child->next())) {
+
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
       LOG_WARN("failed to get current record: %s", strrc(rc));
@@ -44,18 +38,26 @@ RC UpdatePhysicalOperator::next()
     RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
     Record   &record    = row_tuple->record();
 
-    // check the field is same, if is same, we dont need do any thing
-    if (memcmp(record.data() + attr_offset, values_[0].data(), attr_len) == 0) {
-      // do nothing
-      continue;
-    } else {
-      Record old_record(record);
-      memcpy((record.data() + attr_offset), values_[0].data(), attr_len);
-      rc = trx_->update_record(table_, old_record, record);
-    }
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to update record: %s", strrc(rc));
-      return rc;
+    for (size_t i = 0; i < attribute_names_->size(); i++) {
+      // find offset
+      auto field       = table_->table_meta().field(attribute_names_->at(i).c_str());
+      auto attr_len    = field->len();
+      auto attr_offset = field->offset();
+      ASSERT(attr_len == values_[0].length(), "The data type must have same length");
+
+      // check the field is same, if is same, we dont need do any thing
+      if (memcmp(record.data() + attr_offset, values_[i].data(), attr_len) == 0) {
+        // do nothing
+        continue;
+      } else {
+        Record old_record(record);
+        memcpy((record.data() + attr_offset), values_[i].data(), attr_len);
+        rc = trx_->update_record(table_, old_record, record);
+      }
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to update record: %s", strrc(rc));
+        return rc;
+      }
     }
   }
   return RC::RECORD_EOF;

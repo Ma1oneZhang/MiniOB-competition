@@ -15,11 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <stddef.h>
-#include <unordered_set>
-#include <mutex>
-#include <utility>
 
-#include "sql/parser/parse.h"
 #include "storage/record/record.h"
 #include "storage/record/record_manager.h"
 #include "storage/field/field_meta.h"
