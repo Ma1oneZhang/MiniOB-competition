@@ -73,41 +73,44 @@ extern int yydebug;
     JOIN = 279,
     RBRACE = 280,
     COMMA = 281,
-    TRX_BEGIN = 282,
-    TRX_COMMIT = 283,
-    TRX_ROLLBACK = 284,
-    INT_T = 285,
-    STRING_T = 286,
-    FLOAT_T = 287,
-    DATE_T = 288,
-    HELP = 289,
-    EXIT = 290,
-    DOT = 291,
-    INTO = 292,
-    VALUES = 293,
-    FROM = 294,
-    WHERE = 295,
-    LIKE = 296,
-    NOT = 297,
-    AND = 298,
-    SET = 299,
-    ON = 300,
-    LOAD = 301,
-    DATA = 302,
-    INFILE = 303,
-    EXPLAIN = 304,
-    EQ = 305,
-    LT = 306,
-    GT = 307,
-    LE = 308,
-    GE = 309,
-    NE = 310,
-    NUMBER = 311,
-    FLOAT = 312,
-    ID = 313,
-    SSS = 314,
-    DATE_STR = 315,
-    UMINUS = 316
+    ORDER = 282,
+    BY = 283,
+    ASC = 284,
+    TRX_BEGIN = 285,
+    TRX_COMMIT = 286,
+    TRX_ROLLBACK = 287,
+    INT_T = 288,
+    STRING_T = 289,
+    FLOAT_T = 290,
+    DATE_T = 291,
+    HELP = 292,
+    EXIT = 293,
+    DOT = 294,
+    INTO = 295,
+    VALUES = 296,
+    FROM = 297,
+    WHERE = 298,
+    LIKE = 299,
+    NOT = 300,
+    AND = 301,
+    SET = 302,
+    ON = 303,
+    LOAD = 304,
+    DATA = 305,
+    INFILE = 306,
+    EXPLAIN = 307,
+    EQ = 308,
+    LT = 309,
+    GT = 310,
+    LE = 311,
+    GE = 312,
+    NE = 313,
+    NUMBER = 314,
+    FLOAT = 315,
+    ID = 316,
+    SSS = 317,
+    DATE_STR = 318,
+    UMINUS = 319
   };
 #endif
 
@@ -115,7 +118,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 112 "yacc_sql.y"
+#line 115 "yacc_sql.y"
 
   ParsedSqlNode *                   sql_node;
   ConditionSqlNode *                condition;
@@ -123,6 +126,7 @@ union YYSTYPE
   std::vector<Value> *              tuple;
   enum CompOp                       comp;
   RelAttrSqlNode *                  rel_attr;
+  OrderBySqlNode *                  order_by_attr;
   std::vector<AttrInfoSqlNode> *    attr_infos;
   AttrInfoSqlNode *                 attr_info;
   Expression *                      expression;
@@ -134,13 +138,14 @@ union YYSTYPE
   std::vector<std::vector<Value>> * tuple_list;
   std::vector<ConditionSqlNode> *   condition_list;
   std::vector<RelAttrSqlNode> *     rel_attr_list;
+  std::vector<OrderBySqlNode> *     order_by_attr_list;
   std::vector<std::string> *        relation_list;
   std::vector<JoinSqlNode> *        join_list;
   char *                            string;
   int                               number;
   float                             floats;
 
-#line 144 "yacc_sql.hpp"
+#line 149 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

@@ -24,6 +24,18 @@ See the Mulan PSL v2 for more details. */
 class Expression;
 
 /**
+ * @brief 用于orderBy语句
+ * @ingroup SQLParser
+ * @details 用于orderBy语句
+ */
+struct OrderBySqlNode
+{
+  std::string relation_name;
+  std::string attribute_name;
+  bool        is_desc;
+};
+
+/**
  * @defgroup SQLParser SQL Parser
  */
 
@@ -119,7 +131,8 @@ struct SelectSqlNode
   std::vector<RelAttrSqlNode>   attributes;  ///< attributes in select clause
   std::vector<std::string>      relations;   ///< 查询的表
   std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
-  std::vector<JoinSqlNode>      joinctions;
+  std::vector<JoinSqlNode>      joinctions;  ///< join 条件
+  std::vector<OrderBySqlNode>   orderby;     ///< orderby 条件
 };
 
 /**

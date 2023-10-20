@@ -123,22 +123,16 @@ class RowTuple : public Tuple
 {
 public:
   RowTuple() = default;
-  virtual ~RowTuple()
-  {
-    for (FieldExpr *spec : speces_) {
-      delete spec;
-    }
-    speces_.clear();
-  }
+  virtual ~RowTuple() { speces_.clear(); }
 
-  void set_record(Record *record) { this->record_ = record; }
+  void set_record(Record *record) { this->record_ = *record; }
 
   void set_schema(const Table *table, const std::vector<FieldMeta> *fields)
   {
     table_ = table;
     this->speces_.reserve(fields->size());
     for (const FieldMeta &field : *fields) {
-      speces_.push_back(new FieldExpr(table, &field));
+      speces_.push_back(FieldExpr(table, &field));
     }
   }
 
@@ -151,10 +145,10 @@ public:
       return RC::INVALID_ARGUMENT;
     }
 
-    FieldExpr       *field_expr = speces_[index];
-    const FieldMeta *field_meta = field_expr->field().meta();
+    FieldExpr        field_expr = speces_[index];
+    const FieldMeta *field_meta = field_expr.field().meta();
     cell.set_type(field_meta->type());
-    cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+    cell.set_data(this->record_.data() + field_meta->offset(), field_meta->len());
     return RC::SUCCESS;
   }
 
@@ -167,8 +161,8 @@ public:
     }
 
     for (size_t i = 0; i < speces_.size(); ++i) {
-      const FieldExpr *field_expr = speces_[i];
-      const Field     &field      = field_expr->field();
+      const FieldExpr field_expr = speces_[i];
+      const Field    &field      = field_expr.field();
       if (0 == strcmp(field_name, field.field_name())) {
         return cell_at(i, cell);
       }
@@ -188,14 +182,14 @@ public:
   }
 #endif
 
-  Record &record() { return *record_; }
+  Record &record() { return record_; }
 
-  const Record &record() const { return *record_; }
+  const Record &record() const { return record_; }
 
 private:
-  Record                  *record_ = nullptr;
-  const Table             *table_  = nullptr;
-  std::vector<FieldExpr *> speces_;
+  Record                 record_{};
+  const Table           *table_ = nullptr;
+  std::vector<FieldExpr> speces_;
 };
 
 /**

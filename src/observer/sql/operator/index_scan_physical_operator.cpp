@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/index_scan_physical_operator.h"
+#include "sql/expr/tuple.h"
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
 
@@ -59,7 +60,6 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
   }
   index_scanner_ = index_scanner;
 
-  tuple_.set_schema(table_, table_->table_meta().field_metas());
 
   trx_ = trx;
   return RC::SUCCESS;
@@ -79,8 +79,10 @@ RC IndexScanPhysicalOperator::next()
       return rc;
     }
 
-    tuple_.set_record(&current_record_);
-    rc = filter(tuple_, filter_result);
+    tuples_.push_back(new RowTuple());
+    tuples_.back()->set_schema(table_, table_->table_meta().field_metas());
+    tuples_.back()->set_record(&current_record_);
+    rc = filter(*tuples_.back(), filter_result);
     if (rc != RC::SUCCESS) {
       return rc;
     }
@@ -110,8 +112,8 @@ RC IndexScanPhysicalOperator::close()
 
 Tuple *IndexScanPhysicalOperator::current_tuple()
 {
-  tuple_.set_record(&current_record_);
-  return &tuple_;
+  tuples_.back()->set_record(&current_record_);
+  return tuples_.back();
 }
 
 void IndexScanPhysicalOperator::set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs)
