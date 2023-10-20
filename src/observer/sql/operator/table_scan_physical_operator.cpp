@@ -46,7 +46,8 @@ RC TableScanPhysicalOperator::next()
     memcpy(data, current_record_.data(), current_record_.len());
     Record scan_result;
     scan_result.set_data_owner(data, current_record_.len());
-
+    scan_result.set_rid(current_record_.rid());
+    
     auto tuple = new RowTuple();
     tuple->set_record(scan_result);
     tuple->set_schema(table_, table_->table_meta().field_metas());
