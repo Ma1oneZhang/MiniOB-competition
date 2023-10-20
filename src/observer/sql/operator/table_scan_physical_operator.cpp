@@ -61,9 +61,6 @@ RC TableScanPhysicalOperator::next()
 
 RC TableScanPhysicalOperator::close()
 {
-  for (auto ptr : tuples_) {
-    delete ptr;
-  }
   return record_scanner_.close_scan();
 }
 

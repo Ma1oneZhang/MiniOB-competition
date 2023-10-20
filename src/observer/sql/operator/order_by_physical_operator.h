@@ -15,7 +15,6 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/expr/tuple.h"
-#include "sql/parser/parse.h"
 #include "sql/operator/physical_operator.h"
 #include "sql/parser/parse_defs.h"
 

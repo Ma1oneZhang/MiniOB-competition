@@ -32,10 +32,10 @@ bool SortPhysicalOperator::cmp(Tuple *lhs, Tuple *rhs)
       continue;
     } else if (result > 0) {
       // rhs is bigger
-      return order_node.is_desc != true;
+      return order_node.is_desc == true;
     } else {
       // lhs is bigger
-      return order_node.is_desc == true;
+      return order_node.is_desc != true;
     }
   }
   return true;

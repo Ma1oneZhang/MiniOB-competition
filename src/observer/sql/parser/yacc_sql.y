@@ -761,6 +761,7 @@ order_by:
       std::reverse($$->begin(), $$->end());
       delete $3;
     }
+    ;
 
 order_by_node_list:
     /* empty */
@@ -776,6 +777,7 @@ order_by_node_list:
       }
       $$->push_back(*$order_by_node);
     }
+    ;
 order_by_node:
     rel_attr DESC
     {
@@ -792,7 +794,14 @@ order_by_node:
       $$->attribute_name = std::move($1->attribute_name);
       $$->is_desc = false;
       free($1);
-    }
+    }| rel_attr 
+    {
+      $$ = new OrderBySqlNode;
+      $$->relation_name = std::move($1->relation_name);
+      $$->attribute_name = std::move($1->attribute_name);
+      $$->is_desc = false;
+      free($1);
+    };
 where:
     /* empty */
     {
