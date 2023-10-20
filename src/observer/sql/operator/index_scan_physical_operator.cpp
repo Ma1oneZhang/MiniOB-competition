@@ -75,10 +75,12 @@ RC IndexScanPhysicalOperator::next()
     if (rc != RC::SUCCESS) {
       return rc;
     }
+
     auto data = new char[current_record_.len()];
     memcpy(data, current_record_.data(), current_record_.len());
     Record scan_result;
     scan_result.set_data_owner(data, current_record_.len());
+    scan_result.set_rid(current_record_.rid());
 
     auto tuple = new RowTuple();
     tuple->set_schema(table_, table_->table_meta().field_metas());
@@ -115,11 +117,7 @@ RC IndexScanPhysicalOperator::close()
   return RC::SUCCESS;
 }
 
-Tuple *IndexScanPhysicalOperator::current_tuple()
-{
-  tuples_.back()->set_record(current_record_);
-  return tuples_.back();
-}
+Tuple *IndexScanPhysicalOperator::current_tuple() { return tuples_.back(); }
 
 void IndexScanPhysicalOperator::set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs)
 {
