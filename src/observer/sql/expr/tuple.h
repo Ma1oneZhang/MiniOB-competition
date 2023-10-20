@@ -125,7 +125,7 @@ public:
   RowTuple() = default;
   virtual ~RowTuple() { speces_.clear(); }
 
-  void set_record(Record *record) { this->record_ = *record; }
+  void set_record(Record &record) { this->record_ = record; }
 
   void set_schema(const Table *table, const std::vector<FieldMeta> *fields)
   {

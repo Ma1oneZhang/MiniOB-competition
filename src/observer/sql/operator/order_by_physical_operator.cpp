@@ -13,15 +13,11 @@ RC SortPhysicalOperator::open(Trx *trx)
   }
   child_     = children_.front().get();
   this->trx_ = trx;
-  while (RC::SUCCESS == (rc = child_->next())) {
-    tuples.push_back(child_->current_tuple());
-  }
-  std::sort(tuples.begin(), tuples.end(), [this](Tuple *lhs, Tuple *rhs) { return this->cmp(lhs, rhs); });
-  LOG_WARN("We sorted %d tuple", tuples.size());
+
   return RC::SUCCESS;
 }
 
-bool SortPhysicalOperator::cmp(Tuple *lhs, Tuple *rhs)
+bool SortPhysicalOperator::cmp(JoinedTuple *lhs, JoinedTuple *rhs)
 {
   for (auto &order_node : *this->order_by_nodes_) {
     Value lv, rv;
@@ -31,18 +27,26 @@ bool SortPhysicalOperator::cmp(Tuple *lhs, Tuple *rhs)
     if (result == 0) {
       continue;
     } else if (result > 0) {
-      // rhs is bigger
+      // lhs is bigger
       return order_node.is_desc == true;
     } else {
-      // lhs is bigger
+      // rhs is bigger
       return order_node.is_desc != true;
     }
   }
-  return true;
+  return false;
 }
 
 RC SortPhysicalOperator::next()
 {
+  if (pos == -1) {
+    RC rc = RC::SUCCESS;
+    while (RC::SUCCESS == (rc = child_->next())) {
+      tuples.push_back(static_cast<JoinedTuple *>(child_->current_tuple()));
+    }
+    std::sort(tuples.begin(), tuples.end(), [this](JoinedTuple *lhs, JoinedTuple *rhs) { return this->cmp(lhs, rhs); });
+    LOG_WARN("We sorted %d tuple", tuples.size());
+  }
   pos++;
   if (pos == tuples.size()) {
     return RC::RECORD_EOF;

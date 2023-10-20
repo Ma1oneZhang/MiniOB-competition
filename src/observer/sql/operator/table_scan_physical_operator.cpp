@@ -36,39 +36,43 @@ RC TableScanPhysicalOperator::next()
   bool filter_result = false;
   while (record_scanner_.has_next()) {
     rc = record_scanner_.next(current_record_);
+
+    // current_record_
     if (rc != RC::SUCCESS) {
       return rc;
     }
-    tuples_.push_back(new RowTuple());
-    tuples_.back()->set_record(&current_record_);
-    tuples_.back()->set_schema(table_, table_->table_meta().field_metas());
 
-    rc = filter(*tuples_.back(), filter_result);
+    auto data = new char[current_record_.len()];
+    memcpy(data, current_record_.data(), current_record_.len());
+    Record scan_result;
+    scan_result.set_data_owner(data, current_record_.len());
+
+    auto tuple = new RowTuple();
+    tuple->set_record(scan_result);
+    tuple->set_schema(table_, table_->table_meta().field_metas());
+
+    rc = filter(*tuple, filter_result);
     if (rc != RC::SUCCESS) {
+      delete tuple;
       return rc;
     }
 
     if (filter_result) {
-      sql_debug("get a tuple: %s", tuples_.back()->to_string().c_str());
+      tuples_.push_back(tuple);
+      LOG_WARN("get a tuple: %s", tuples_.back()->to_string().c_str());
       break;
     } else {
       sql_debug("a tuple is filtered: %s", tuples_.back()->to_string().c_str());
+      delete tuple;
       rc = RC::RECORD_EOF;
     }
   }
   return rc;
 }
 
-RC TableScanPhysicalOperator::close()
-{
-  return record_scanner_.close_scan();
-}
+RC TableScanPhysicalOperator::close() { return record_scanner_.close_scan(); }
 
-Tuple *TableScanPhysicalOperator::current_tuple()
-{
-  tuples_.back()->set_record(&current_record_);
-  return tuples_.back();
-}
+Tuple *TableScanPhysicalOperator::current_tuple() { return tuples_.back(); }
 
 string TableScanPhysicalOperator::param() const { return table_->name(); }
 
