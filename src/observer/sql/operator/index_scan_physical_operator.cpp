@@ -46,7 +46,6 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
       right_value_.length(),
       right_inclusive_);
   if (nullptr == index_scanner) {
-    LOG_WARN("failed to create index scanner");
     return RC::INTERNAL;
   }
 
@@ -76,15 +75,9 @@ RC IndexScanPhysicalOperator::next()
       return rc;
     }
 
-    auto data = new char[current_record_.len()];
-    memcpy(data, current_record_.data(), current_record_.len());
-    Record scan_result;
-    scan_result.set_data_owner(data, current_record_.len());
-    scan_result.set_rid(current_record_.rid());
-
     auto tuple = new RowTuple();
     tuple->set_schema(table_, table_->table_meta().field_metas());
-    tuple->set_record(scan_result);
+    tuple->set_record(current_record_);
     rc = filter(*tuple, filter_result);
     if (rc != RC::SUCCESS) {
       delete tuple;
