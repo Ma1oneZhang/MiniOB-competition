@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/table_scan_physical_operator.h"
+#include "sql/expr/tuple.h"
 #include "storage/table/table.h"
 #include "event/sql_debug.h"
 
@@ -21,10 +22,7 @@ using namespace std;
 RC TableScanPhysicalOperator::open(Trx *trx)
 {
   RC rc = table_->get_record_scanner(record_scanner_, trx, readonly_);
-  if (rc == RC::SUCCESS) {
-    tuple_.set_schema(table_, table_->table_meta().field_metas());
-  }
-  trx_ = trx;
+  trx_  = trx;
   return rc;
 }
 
@@ -34,46 +32,43 @@ RC TableScanPhysicalOperator::next()
     return RC::RECORD_EOF;
   }
 
-  RC rc = RC::SUCCESS;
+  RC   rc            = RC::SUCCESS;
   bool filter_result = false;
   while (record_scanner_.has_next()) {
     rc = record_scanner_.next(current_record_);
+
+    // current_record_
     if (rc != RC::SUCCESS) {
       return rc;
     }
+    auto tuple = new RowTuple();
+    tuple->set_record(current_record_);
+    tuple->set_schema(table_, table_->table_meta().field_metas());
 
-    tuple_.set_record(&current_record_);
-    rc = filter(tuple_, filter_result);
+    rc = filter(*tuple, filter_result);
     if (rc != RC::SUCCESS) {
+      delete tuple;
       return rc;
     }
 
     if (filter_result) {
-      sql_debug("get a tuple: %s", tuple_.to_string().c_str());
+      tuples_.push_back(tuple);
+      // LOG_WARN("get a tuple: %s", tuples_.back()->to_string().c_str());
       break;
     } else {
-      sql_debug("a tuple is filtered: %s", tuple_.to_string().c_str());
+      // sql_debug("a tuple is filtered: %s", tuples_.back()->to_string().c_str());
+      delete tuple;
       rc = RC::RECORD_EOF;
     }
   }
   return rc;
 }
 
-RC TableScanPhysicalOperator::close()
-{
-  return record_scanner_.close_scan();
-}
+RC TableScanPhysicalOperator::close() { return record_scanner_.close_scan(); }
 
-Tuple *TableScanPhysicalOperator::current_tuple()
-{
-  tuple_.set_record(&current_record_);
-  return &tuple_;
-}
+Tuple *TableScanPhysicalOperator::current_tuple() { return tuples_.back(); }
 
-string TableScanPhysicalOperator::param() const
-{
-  return table_->name();
-}
+string TableScanPhysicalOperator::param() const { return table_->name(); }
 
 void TableScanPhysicalOperator::set_predicates(vector<unique_ptr<Expression>> &&exprs)
 {
@@ -82,7 +77,7 @@ void TableScanPhysicalOperator::set_predicates(vector<unique_ptr<Expression>> &&
 
 RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
 {
-  RC rc = RC::SUCCESS;
+  RC    rc = RC::SUCCESS;
   Value value;
   for (unique_ptr<Expression> &expr : predicates_) {
     rc = expr->get_value(tuple, value);

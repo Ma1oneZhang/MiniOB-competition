@@ -33,15 +33,16 @@ See the Mulan PSL v2 for more details. */
 enum class LogicalOperatorType
 {
   CALC,
-  TABLE_GET,   ///< 从表中获取数据
-  PREDICATE,   ///< 过滤，就是谓词
-  PROJECTION,  ///< 投影，就是select
-  JOIN,        ///< 连接
-  INSERT,      ///< 插入
-  DELETE,      ///< 删除，删除可能会有子查询
-  EXPLAIN,     ///< 查看执行计划
-  UPDATE,      ///< 更新表
-  AGGREGATION  ///< 聚合函数
+  TABLE_GET,    ///< 从表中获取数据
+  PREDICATE,    ///< 过滤，就是谓词
+  PROJECTION,   ///< 投影，就是select
+  JOIN,         ///< 连接
+  INSERT,       ///< 插入
+  DELETE,       ///< 删除，删除可能会有子查询
+  EXPLAIN,      ///< 查看执行计划
+  UPDATE,       ///< 更新表
+  AGGREGATION,  ///< 聚合函数
+  ORDER_BY      ///< 排序
 };
 
 /**
@@ -61,9 +62,9 @@ public:
   std::vector<std::unique_ptr<Expression>>      &expressions() { return expressions_; }
 
 protected:
-  std::vector<std::unique_ptr<LogicalOperator>> children_;  ///< 子算子
+  std::vector<std::unique_ptr<LogicalOperator>> children_{};  ///< 子算子
 
   ///< 表达式，比如select中的列，where中的谓词等等，都可以使用表达式来表示
   ///< 表达式能是一个常量，也可以是一个函数，也可以是一个列，也可以是一个子查询等等
-  std::vector<std::unique_ptr<Expression>> expressions_;
+  std::vector<std::unique_ptr<Expression>> expressions_{};
 };

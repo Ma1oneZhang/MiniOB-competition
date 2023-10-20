@@ -28,6 +28,7 @@ std::string physical_operator_type_name(PhysicalOperatorType type)
     case PhysicalOperatorType::STRING_LIST: return "STRING_LIST";
     case PhysicalOperatorType::UPDATE: return "UPDATE";
     case PhysicalOperatorType::AGGREGATION: return "AGGREGATION";
+    case PhysicalOperatorType::ORDER_BY: return "SORT";
     default: return "UNKNOWN";
   }
 }

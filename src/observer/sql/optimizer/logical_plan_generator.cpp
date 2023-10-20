@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/aggregation_func_logical_operator.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
+#include "sql/operator/order_by_logical_operator.h"
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/predicate_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
@@ -130,20 +131,13 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
     return rc;
   }
-
+  // if order by not nullptr
+  unique_ptr<LogicalOperator> order_by_oper(nullptr);
+  if (select_stmt->order_by_stmt()) {
+    order_by_oper = make_unique<OrderByLogicalOperator>(select_stmt->order_by_stmt()->get_order_by_units());
+  }
   unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(all_fields));
-  if (!aggregation_oper) {
-    if (predicate_oper) {
-      if (table_oper) {
-        predicate_oper->add_child(std::move(table_oper));
-      }
-      project_oper->add_child(std::move(predicate_oper));
-    } else {
-      if (table_oper) {
-        project_oper->add_child(std::move(table_oper));
-      }
-    }
-  } else {
+  if (aggregation_oper) {
     if (predicate_oper) {
       // must have table scan operation
       if (table_oper) {
@@ -154,6 +148,29 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     } else {
       aggregation_oper->add_child(std::move(table_oper));
       project_oper->add_child(std::move(aggregation_oper));
+    }
+  } else if (order_by_oper) {
+    if (predicate_oper) {
+      // must have table scan operation
+      if (table_oper) {
+        predicate_oper->add_child(std::move(table_oper));
+      }
+      order_by_oper->add_child(std::move(predicate_oper));
+      project_oper->add_child(std::move(order_by_oper));
+    } else {
+      order_by_oper->add_child(std::move(table_oper));
+      project_oper->add_child(std::move(order_by_oper));
+    }
+  } else {
+    if (predicate_oper) {
+      if (table_oper) {
+        predicate_oper->add_child(std::move(table_oper));
+      }
+      project_oper->add_child(std::move(predicate_oper));
+    } else {
+      if (table_oper) {
+        project_oper->add_child(std::move(table_oper));
+      }
     }
   }
 
@@ -261,7 +278,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, false /*readonly*/));
 
   unique_ptr<LogicalOperator> predicate_oper;
-  RC rc = RC::SUCCESS;
+  RC                          rc = RC::SUCCESS;
   if (filter_stmt != nullptr)
     rc = create_plan(filter_stmt, predicate_oper);
   if (rc != RC::SUCCESS) {

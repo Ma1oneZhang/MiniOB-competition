@@ -13,17 +13,16 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/index_scan_physical_operator.h"
+#include "sql/expr/tuple.h"
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
 
-IndexScanPhysicalOperator::IndexScanPhysicalOperator(
-    Table *table, Index *index, bool readonly, 
-    const Value *left_value, bool left_inclusive, 
-    const Value *right_value, bool right_inclusive)
-    : table_(table), 
-      index_(index), 
-      readonly_(readonly), 
-      left_inclusive_(left_inclusive), 
+IndexScanPhysicalOperator::IndexScanPhysicalOperator(Table *table, Index *index, bool readonly, const Value *left_value,
+    bool left_inclusive, const Value *right_value, bool right_inclusive)
+    : table_(table),
+      index_(index),
+      readonly_(readonly),
+      left_inclusive_(left_inclusive),
       right_inclusive_(right_inclusive)
 {
   if (left_value) {
@@ -47,7 +46,6 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
       right_value_.length(),
       right_inclusive_);
   if (nullptr == index_scanner) {
-    LOG_WARN("failed to create index scanner");
     return RC::INTERNAL;
   }
 
@@ -59,8 +57,6 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
   }
   index_scanner_ = index_scanner;
 
-  tuple_.set_schema(table_, table_->table_meta().field_metas());
-
   trx_ = trx;
   return RC::SUCCESS;
 }
@@ -68,7 +64,7 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
 RC IndexScanPhysicalOperator::next()
 {
   RID rid;
-  RC rc = RC::SUCCESS;
+  RC  rc = RC::SUCCESS;
 
   record_page_handler_.cleanup();
 
@@ -79,20 +75,26 @@ RC IndexScanPhysicalOperator::next()
       return rc;
     }
 
-    tuple_.set_record(&current_record_);
-    rc = filter(tuple_, filter_result);
+    auto tuple = new RowTuple();
+    tuple->set_schema(table_, table_->table_meta().field_metas());
+    tuple->set_record(current_record_);
+    rc = filter(*tuple, filter_result);
     if (rc != RC::SUCCESS) {
+      delete tuple;
       return rc;
     }
 
     if (!filter_result) {
+      delete tuple;
       continue;
     }
 
     rc = trx_->visit_record(table_, current_record_, readonly_);
     if (rc == RC::RECORD_INVISIBLE) {
+      delete tuple;
       continue;
     } else {
+      tuples_.push_back(tuple);
       return rc;
     }
   }
@@ -102,17 +104,13 @@ RC IndexScanPhysicalOperator::next()
 
 RC IndexScanPhysicalOperator::close()
 {
-  if(index_scanner_ != nullptr)
+  if (index_scanner_ != nullptr)
     index_scanner_->destroy();
   index_scanner_ = nullptr;
   return RC::SUCCESS;
 }
 
-Tuple *IndexScanPhysicalOperator::current_tuple()
-{
-  tuple_.set_record(&current_record_);
-  return &tuple_;
-}
+Tuple *IndexScanPhysicalOperator::current_tuple() { return tuples_.back(); }
 
 void IndexScanPhysicalOperator::set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs)
 {
@@ -121,7 +119,7 @@ void IndexScanPhysicalOperator::set_predicates(std::vector<std::unique_ptr<Expre
 
 RC IndexScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
 {
-  RC rc = RC::SUCCESS;
+  RC    rc = RC::SUCCESS;
   Value value;
   for (std::unique_ptr<Expression> &expr : predicates_) {
     rc = expr->get_value(tuple, value);

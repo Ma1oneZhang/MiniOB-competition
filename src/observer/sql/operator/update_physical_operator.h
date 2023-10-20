@@ -2,6 +2,7 @@
 
 #include "sql/operator/delete_physical_operator.h"
 #include "sql/operator/physical_operator.h"
+#include "storage/record/record_manager.h"
 
 class Trx;
 class UpdateStmt;
@@ -22,6 +23,7 @@ public:
   Tuple *current_tuple() override { return nullptr; }
 
 private:
+  RecordFileScanner         record_scanner_;
   Table                    *table_           = nullptr;
   Trx                      *trx_             = nullptr;
   std::vector<std::string> *attribute_names_ = nullptr;

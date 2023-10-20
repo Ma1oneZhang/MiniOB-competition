@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/filter_stmt.h"
 #include "common/log/log.h"
 #include "common/lang/string.h"
+#include "sql/stmt/order_by_stmt.h"
 #include "storage/db/db.h"
 #include "storage/field/field.h"
 #include "storage/table/table.h"
@@ -75,6 +76,9 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     const RelAttrSqlNode &relation_attr = select_sql.attributes[i];
     if (relation_attr.aggregation_type != AggregationType::NONE) {
       // aggregation function
+      if (select_sql.orderby.size() != 0) {
+        return RC::INVALID_ARGUMENT;
+      }
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
           0 == strcmp(relation_attr.attribute_name.c_str(), "*")) {
         // only count operation support "*" relation
@@ -238,19 +242,26 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   FilterStmt *filter_stmt = nullptr;
   RC          rc          = FilterStmt::create(
       db, default_table, &table_map, conditions.data(), static_cast<int>(conditions.size()), filter_stmt);
-
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
 
+  // create order by stmt in 'ordey_by' statement
+  OrderByStmt *order_by_stmt = nullptr;
+  rc                         = OrderByStmt::create(db, default_table, &table_map, &select_sql.orderby, order_by_stmt);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("cannot construct order by stmt");
+    return rc;
+  }
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
-  // TODO add expression copy
+
   select_stmt->tables_ = std::vector<Table *>(tables.begin(), tables.end());
   select_stmt->query_fields_.swap(query_fields);
-  select_stmt->filter_stmt_ = filter_stmt;
-  stmt                      = select_stmt;
+  select_stmt->filter_stmt_   = filter_stmt;
+  select_stmt->order_by_stmt_ = order_by_stmt;
+  stmt                        = select_stmt;
 
   return RC::SUCCESS;
 }

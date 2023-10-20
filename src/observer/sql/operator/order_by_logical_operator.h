@@ -10,6 +10,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/operator/logical_operator.h"
+#include "sql/parser/parse_defs.h"
 #include "storage/field/field.h"
 
 /**
@@ -17,19 +18,17 @@ See the Mulan PSL v2 for more details. */
  * @details 表示聚合函数算子
  * @ingroup LogicalOperator
  */
-class AggregationLogicalOperator : public LogicalOperator
+class OrderByLogicalOperator : public LogicalOperator
 {
 public:
-  AggregationLogicalOperator(Table *tables, const std::vector<Field> &fields);
-  virtual ~AggregationLogicalOperator() = default;
+  OrderByLogicalOperator(std::vector<OrderBySqlNode> *fields);
+  virtual ~OrderByLogicalOperator() = default;
 
-  LogicalOperatorType type() const override { return LogicalOperatorType::AGGREGATION; }
+  LogicalOperatorType type() const override { return LogicalOperatorType::ORDER_BY; }
 
-  const Table        *tables() const { return tables_; }
-  std::vector<Field> &field() { return fields_; }
+  std::vector<OrderBySqlNode> *field() { return fields_; }
 
 private:
-  Table *tables_;
-  // 聚合函数所需要聚合的字段
-  std::vector<Field> fields_;
+  // 排序所需字段及其情况
+  std::vector<OrderBySqlNode> *fields_;
 };

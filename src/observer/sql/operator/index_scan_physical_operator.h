@@ -60,7 +60,7 @@ private:
 
   RecordPageHandler record_page_handler_;
   Record current_record_;
-  RowTuple tuple_;
+  std::vector<RowTuple *> tuples_;
 
   Value left_value_;
   Value right_value_;
