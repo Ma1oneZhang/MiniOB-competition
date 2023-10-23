@@ -36,14 +36,16 @@ public:
 
 void parallel_merge_sort(vector<Tuple *>::iterator begin, vector<Tuple *>::iterator end, cmp &cmp)
 {
-  auto mid = begin + (end - begin) / 2;
+
   if (end - begin > 128) {
+    auto mid = begin + (end - begin) / 2;
     auto f1 = std::async(std::launch::async, [&]() { parallel_merge_sort(begin, mid, cmp); });
     auto f2 = std::async(std::launch::async, [&]() { parallel_merge_sort(mid, end, cmp); });
     f1.wait();
     f2.wait();
-  } else {
     std::inplace_merge(begin, mid, end, cmp);
+  } else {
+    std::sort(begin, end, cmp);
   }
 }
 
