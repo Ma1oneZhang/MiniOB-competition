@@ -64,17 +64,11 @@ RC SortPhysicalOperator::next()
 {
   if (pos == -1) {
     RC   rc  = RC::SUCCESS;
-    auto now = std::chrono::system_clock::now();
     while (RC::SUCCESS == (rc = child_->next())) {
       tuples.push_back(child_->current_tuple());
     }
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - now) << '\n';
-    now = std::chrono::system_clock::now();
     cmp cmp(order_by_nodes_);
     parallel_merge_sort(tuples.begin(), tuples.end(), cmp);
-    std::cout << "Spend "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - now).count()
-              << " for sort" << '\n';
     LOG_WARN("We sorted %d tuple", tuples.size());
   }
   pos++;
