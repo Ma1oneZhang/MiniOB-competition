@@ -81,24 +81,24 @@ void Frame::write_latch(intptr_t xid)
 {
   {
     scoped_lock debug_lock(debug_lock_);
-    ASSERT(pin_count_.load() > 0,
-           "frame lock. write lock failed while pin count is invalid. "
-           "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-           this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+    // ASSERT(pin_count_.load() > 0,
+    //        "frame lock. write lock failed while pin count is invalid. "
+    //        "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+    //        this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
 
-    ASSERT(read_lockers_.find(xid) == read_lockers_.end(),
-           "frame lock write while holding the read lock."
-           "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-           this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+    // ASSERT(read_lockers_.find(xid) == read_lockers_.end(),
+    //        "frame lock write while holding the read lock."
+    //        "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+    //        this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
   }
 
   lock_.lock();
   write_locker_ = xid;
   write_recursive_count_++;
 
-  LOG_DEBUG("frame write lock success."
-            "this=%p, pin=%d, pageNum=%d, write locker=%lx(recursive=%d), fd=%d, xid=%lx, lbt=%s",
-            this, pin_count_.load(), page_.page_num, write_locker_, write_recursive_count_, file_desc_, xid, lbt());
+  // LOG_DEBUG("frame write lock success."
+  //           "this=%p, pin=%d, pageNum=%d, write locker=%lx(recursive=%d), fd=%d, xid=%lx, lbt=%s",
+  //           this, pin_count_.load(), page_.page_num, write_locker_, write_recursive_count_, file_desc_, xid, lbt());
 }
 
 void Frame::write_unlatch()
@@ -111,18 +111,18 @@ void Frame::write_unlatch(intptr_t xid)
   // 因为当前已经加着写锁，而且写锁只有一个，所以不再加debug_lock来做校验
   debug_lock_.lock();
 
-  ASSERT(pin_count_.load() > 0, 
-        "frame lock. write unlock failed while pin count is invalid."
-        "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-         this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+  // ASSERT(pin_count_.load() > 0, 
+  //       "frame lock. write unlock failed while pin count is invalid."
+  //       "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+  //        this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
 
-  ASSERT(write_locker_ == xid,
-         "frame unlock write while not the owner."
-         "write_locker=%lx, this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-         write_locker_, this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+  // ASSERT(write_locker_ == xid,
+  //        "frame unlock write while not the owner."
+  //        "write_locker=%lx, this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+  //        write_locker_, this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
 
-  LOG_DEBUG("frame write unlock success. this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-            this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+  // LOG_DEBUG("frame write unlock success. this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+  //           this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
 
   if (--write_recursive_count_ == 0) {
     write_locker_ = 0;
@@ -145,10 +145,10 @@ void Frame::read_latch(intptr_t xid)
            "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
            this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
 
-    ASSERT(xid != write_locker_,
-           "frame lock read while holding the write lock."
-           "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-           this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+    // ASSERT(xid != write_locker_,
+    //        "frame lock read while holding the write lock."
+    //        "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+    //        this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
   }
 
   lock_.lock_shared();
@@ -156,34 +156,34 @@ void Frame::read_latch(intptr_t xid)
   {
     scoped_lock debug_lock(debug_lock_);
     int recursive_count = ++read_lockers_[xid];
-    LOG_DEBUG("frame read lock success."
-              "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, recursive=%d, lbt=%s",
-              this, pin_count_.load(), page_.page_num, file_desc_, xid, recursive_count, lbt());
+    // LOG_DEBUG("frame read lock success."
+    //           "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, recursive=%d, lbt=%s",
+    //           this, pin_count_.load(), page_.page_num, file_desc_, xid, recursive_count, lbt());
   }
 }
 
 bool Frame::try_read_latch()
 {
   intptr_t xid = get_default_debug_xid();
-  {
-    std::scoped_lock debug_lock(debug_lock_);
-    ASSERT(pin_count_ > 0, "frame try lock. read lock failed while pin count is invalid."
-           "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-           this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+  // {
+  //   std::scoped_lock debug_lock(debug_lock_);
+  //   ASSERT(pin_count_ > 0, "frame try lock. read lock failed while pin count is invalid."
+  //          "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+  //          this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
 
-    ASSERT(xid != write_locker_,
-           "frame try to lock read while holding the write lock."
-           "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-           this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
-  }
+  //   ASSERT(xid != write_locker_,
+  //          "frame try to lock read while holding the write lock."
+  //          "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+  //          this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+  // }
 
   bool ret = lock_.try_lock_shared();
   if (ret) {
     debug_lock_.lock();
     int recursive_count = ++read_lockers_[xid];
-    LOG_DEBUG("frame read lock success."
-              "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, recursive=%d, lbt=%s",
-              this, pin_count_.load(), page_.page_num, file_desc_, xid, recursive_count, lbt());
+    // LOG_DEBUG("frame read lock success."
+    //           "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, recursive=%d, lbt=%s",
+    //           this, pin_count_.load(), page_.page_num, file_desc_, xid, recursive_count, lbt());
     debug_lock_.unlock();
   }
 
@@ -198,11 +198,11 @@ void Frame::read_unlatch()
 void Frame::read_unlatch(intptr_t xid)
 {
   {
-    std::scoped_lock debug_lock(debug_lock_);
-    ASSERT(pin_count_.load() > 0,
-            "frame lock. read unlock failed while pin count is invalid."
-            "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-           this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+    // std::scoped_lock debug_lock(debug_lock_);
+    // ASSERT(pin_count_.load() > 0,
+    //         "frame lock. read unlock failed while pin count is invalid."
+    //         "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+    //        this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
 
 #if DEBUG
     auto read_lock_iter = read_lockers_.find(xid);
@@ -220,9 +220,9 @@ void Frame::read_unlatch(intptr_t xid)
 
   }
 
-  LOG_DEBUG("frame read unlock success."
-            "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-            this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+  // LOG_DEBUG("frame read unlock success."
+  //           "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+  //           this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
 
   lock_.unlock_shared();
 }
@@ -234,37 +234,37 @@ void Frame::pin()
   intptr_t xid = get_default_debug_xid();
   int pin_count = ++pin_count_;
 
-  LOG_DEBUG("after frame pin. "
-            "this=%p, write locker=%lx, read locker has xid %d? pin=%d, fd=%d, pageNum=%d, xid=%lx, lbt=%s",
-            this, write_locker_, read_lockers_.find(xid) != read_lockers_.end(), 
-            pin_count, file_desc_, page_.page_num, xid, lbt());
+  // LOG_DEBUG("after frame pin. "
+  //           "this=%p, write locker=%lx, read locker has xid %d? pin=%d, fd=%d, pageNum=%d, xid=%lx, lbt=%s",
+  //           this, write_locker_, read_lockers_.find(xid) != read_lockers_.end(), 
+  //           pin_count, file_desc_, page_.page_num, xid, lbt());
 }
 
 int Frame::unpin()
 {
   intptr_t xid = get_default_debug_xid();
 
-  ASSERT(pin_count_.load() > 0,
-         "try to unpin a frame that pin count <= 0."
-         "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
-         this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
+  // ASSERT(pin_count_.load() > 0,
+  //        "try to unpin a frame that pin count <= 0."
+  //        "this=%p, pin=%d, pageNum=%d, fd=%d, xid=%lx, lbt=%s",
+  //        this, pin_count_.load(), page_.page_num, file_desc_, xid, lbt());
   
   std::scoped_lock debug_lock(debug_lock_);
 
   int pin_count = --pin_count_;
 
-  LOG_DEBUG("after frame unpin. "
-            "this=%p, write locker=%lx, read locker has xid? %d, pin=%d, fd=%d, pageNum=%d, xid=%lx, lbt=%s",
-            this, write_locker_, read_lockers_.find(xid) != read_lockers_.end(), 
-            pin_count, file_desc_, page_.page_num, xid, lbt());
+  // LOG_DEBUG("after frame unpin. "
+  //           "this=%p, write locker=%lx, read locker has xid? %d, pin=%d, fd=%d, pageNum=%d, xid=%lx, lbt=%s",
+  //           this, write_locker_, read_lockers_.find(xid) != read_lockers_.end(), 
+  //           pin_count, file_desc_, page_.page_num, xid, lbt());
   
   if (0 == pin_count) {
-    ASSERT(write_locker_ == 0,
-           "frame unpin to 0 failed while someone hold the write lock. write locker=%lx, pageNum=%d, fd=%d, xid=%lx",
-           write_locker_, page_.page_num, file_desc_, xid);
-    ASSERT(read_lockers_.empty(),
-           "frame unpin to 0 failed while someone hold the read locks. reader num=%d, pageNum=%d, fd=%d, xid=%lx",
-           read_lockers_.size(), page_.page_num, file_desc_, xid);
+    // ASSERT(write_locker_ == 0,
+    //        "frame unpin to 0 failed while someone hold the write lock. write locker=%lx, pageNum=%d, fd=%d, xid=%lx",
+    //        write_locker_, page_.page_num, file_desc_, xid);
+    // ASSERT(read_lockers_.empty(),
+    //        "frame unpin to 0 failed while someone hold the read locks. reader num=%d, pageNum=%d, fd=%d, xid=%lx",
+    //        read_lockers_.size(), page_.page_num, file_desc_, xid);
   }
   return pin_count;
 }

@@ -1,8 +1,53 @@
 #include "common/log/log.h"
+#include <future>
 #include "sql/expr/tuple.h"
 #include "sql/operator/physical_operator.h"
 #include "storage/trx/trx.h"
+// #include <boost/sort/parallel_stable_sort/parallel_stable_sort.hpp>
 #include "sql/operator/order_by_physical_operator.h"
+#include <chrono>
+#include <vector>
+
+class cmp
+{
+public:
+  cmp(std::vector<OrderBySqlNode> *o) : order_by_nodes_(o){};
+  bool operator()(Tuple *lhs, Tuple *rhs)
+  {
+    for (auto &order_node : *order_by_nodes_) {
+      Value lv, rv;
+      lhs->find_cell({order_node.relation_name.c_str(), order_node.attribute_name.c_str()}, lv);
+      rhs->find_cell({order_node.relation_name.c_str(), order_node.attribute_name.c_str()}, rv);
+      int result = lv.compare(rv);
+      if (result == 0) {
+        continue;
+      } else if (result > 0) {
+        // lhs is bigger
+        return order_node.is_desc == true;
+      } else {
+        // rhs is bigger
+        return order_node.is_desc != true;
+      }
+    }
+    return false;
+  }
+  std::vector<OrderBySqlNode> *order_by_nodes_;
+};
+
+void parallel_merge_sort(vector<Tuple *>::iterator begin, vector<Tuple *>::iterator end, cmp &cmp)
+{
+
+  if (end - begin > 128) {
+    auto mid = begin + (end - begin) / 2;
+    auto f1 = std::async(std::launch::async, [&]() { parallel_merge_sort(begin, mid, cmp); });
+    auto f2 = std::async(std::launch::async, [&]() { parallel_merge_sort(mid, end, cmp); });
+    f1.wait();
+    f2.wait();
+    std::inplace_merge(begin, mid, end, cmp);
+  } else {
+    std::sort(begin, end, cmp);
+  }
+}
 
 RC SortPhysicalOperator::open(Trx *trx)
 {
@@ -17,34 +62,15 @@ RC SortPhysicalOperator::open(Trx *trx)
   return RC::SUCCESS;
 }
 
-bool SortPhysicalOperator::cmp(JoinedTuple *lhs, JoinedTuple *rhs)
-{
-  for (auto &order_node : *this->order_by_nodes_) {
-    Value lv, rv;
-    lhs->find_cell({order_node.relation_name.c_str(), order_node.attribute_name.c_str()}, lv);
-    rhs->find_cell({order_node.relation_name.c_str(), order_node.attribute_name.c_str()}, rv);
-    int result = lv.compare(rv);
-    if (result == 0) {
-      continue;
-    } else if (result > 0) {
-      // lhs is bigger
-      return order_node.is_desc == true;
-    } else {
-      // rhs is bigger
-      return order_node.is_desc != true;
-    }
-  }
-  return false;
-}
-
 RC SortPhysicalOperator::next()
 {
   if (pos == -1) {
     RC rc = RC::SUCCESS;
     while (RC::SUCCESS == (rc = child_->next())) {
-      tuples.push_back(static_cast<JoinedTuple *>(child_->current_tuple()));
+      tuples.push_back(child_->current_tuple());
     }
-    std::sort(tuples.begin(), tuples.end(), [this](JoinedTuple *lhs, JoinedTuple *rhs) { return this->cmp(lhs, rhs); });
+    cmp cmp(order_by_nodes_);
+    parallel_merge_sort(tuples.begin(), tuples.end(), cmp);
     LOG_WARN("We sorted %d tuple", tuples.size());
   }
   pos++;
