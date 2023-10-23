@@ -39,7 +39,7 @@ void parallel_merge_sort(vector<Tuple *>::iterator begin, vector<Tuple *>::itera
   auto mid = begin + (end - begin) / 2;
   if (end - begin > 128) {
     auto f1 = std::async(std::launch::async, [&]() { parallel_merge_sort(begin, mid, cmp); });
-    auto f2 = std::async(std::launch::async, [&]() { parallel_merge_sort(begin, mid, cmp); });
+    auto f2 = std::async(std::launch::async, [&]() { parallel_merge_sort(mid, end, cmp); });
     f1.wait();
     f2.wait();
   } else {
@@ -63,7 +63,7 @@ RC SortPhysicalOperator::open(Trx *trx)
 RC SortPhysicalOperator::next()
 {
   if (pos == -1) {
-    RC   rc  = RC::SUCCESS;
+    RC rc = RC::SUCCESS;
     while (RC::SUCCESS == (rc = child_->next())) {
       tuples.push_back(child_->current_tuple());
     }
