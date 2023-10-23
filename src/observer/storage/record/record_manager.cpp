@@ -104,7 +104,7 @@ RC RecordPageHandler::init(DiskBufferPool &buffer_pool, PageNum page_num, bool r
   page_header_      = (PageHeader *)(data);
   bitmap_           = data + PAGE_HEADER_SIZE;
 
-  LOG_TRACE("Successfully init page_num %d.", page_num);
+  // LOG_TRACE("Successfully init page_num %d.", page_num);
   return ret;
 }
 

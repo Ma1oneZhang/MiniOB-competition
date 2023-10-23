@@ -37,12 +37,10 @@ public:
   Tuple *current_tuple() override;
 
 private:
-  bool cmp(JoinedTuple *, JoinedTuple *);
   Trx *trx_ = nullptr;
-
   //! 左表右表的真实对象是在PhysicalOperator::children_中，这里是为了写的时候更简单
   PhysicalOperator            *child_ = nullptr;
-  std::vector<JoinedTuple *>   tuples{};
+  std::vector<Tuple *>         tuples{};
   int                          pos             = -1;
   bool                         is_executed     = false;
   std::vector<OrderBySqlNode> *order_by_nodes_ = nullptr;
