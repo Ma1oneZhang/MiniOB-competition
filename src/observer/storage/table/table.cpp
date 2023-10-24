@@ -299,6 +299,11 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value     &value = values[i];
+
+    if(value.get_isnull()){
+      continue;
+    }
+
     if (field->type() != value.attr_type()) {
       LOG_ERROR("Invalid value type. table name =%s, field name=%s, type=%d, but given=%d",
                 table_meta_.name(), field->name(), field->type(), value.attr_type());
@@ -309,11 +314,22 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   // 复制所有字段的值
   int   record_size = table_meta_.record_size();
   char *record_data = (char *)malloc(record_size);
+  int   null_bitmap_offset = table_meta_.null_bitmap_offset();
+  int   null_bitmap_size = table_meta_.null_bitmap_size();
+  char  null_bitmap[null_bitmap_size] = {};
 
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field    = table_meta_.field(i + normal_field_start_index);
     const Value     &value    = values[i];
     size_t           copy_len = field->len();
+
+    // set null bitmap
+    if (value.get_isnull()) {
+      null_bitmap[i / 8] |= (1 << (i % 8));      
+    } else {
+      null_bitmap[i / 8] &= ~(1 << (i % 8));
+    }
+
     if (field->type() == CHARS) {
       const size_t data_len = value.length();
       if (copy_len > data_len) {
@@ -322,6 +338,8 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     }
     memcpy(record_data + field->offset(), value.data(), copy_len);
   }
+
+  memcpy(record_data+null_bitmap_offset, null_bitmap, null_bitmap_size);
 
   record.set_data_owner(record_data, record_size);
   return RC::SUCCESS;

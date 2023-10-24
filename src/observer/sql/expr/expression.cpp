@@ -89,10 +89,27 @@ ComparisonExpr::~ComparisonExpr() {}
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
   RC rc = RC::SUCCESS;
-  if (comp_ == CompOp::LIKE_OP || comp_ == CompOp::NOT_LIKE_OP) {
-    // DO like operation
-    return like_operation(left, right, result, comp_ == CompOp::LIKE_OP);
+  switch(comp_) {
+    case CompOp::LIKE_OP:
+    case CompOp::NOT_LIKE_OP: {
+      // DO like operation
+      return like_operation(left, right, result, comp_ == CompOp::LIKE_OP);
+    } break;
+    case CompOp::IS_NULL: {
+      result = left.get_isnull();
+      return rc;
+    } break;
+    case CompOp::IS_NOT_NULL: {
+      result = !(left.get_isnull());
+      return rc;
+    }break;
   }
+
+  if(left.get_isnull() | right.get_isnull()) {
+    result = false;
+    return rc;
+  }
+
   int cmp_result = left.compare(right);
   result         = false;
   switch (comp_) {

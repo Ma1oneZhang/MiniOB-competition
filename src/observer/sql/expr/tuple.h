@@ -147,6 +147,18 @@ public:
 
     FieldExpr        field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr.field().meta();
+
+    // restore null value
+    if(field_meta->nullable()){
+      int null_bitmap_offset = table_->table_meta().null_bitmap_offset();
+      int null_bitmap_size = table_->table_meta().null_bitmap_size();
+      char bitmap = *(this->record_.data() + null_bitmap_offset + null_bitmap_size - 1 - index/8);
+      bool null = (bitmap & (1 << (index%8))) != 0;
+      if(null){
+        cell.set_isnull();
+      }
+    }
+
     cell.set_type(field_meta->type());
     cell.set_data(this->record_.data() + field_meta->offset(), field_meta->len());
     return RC::SUCCESS;
