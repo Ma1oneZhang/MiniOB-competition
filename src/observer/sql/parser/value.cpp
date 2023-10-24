@@ -161,6 +161,16 @@ void Value::set_value(const Value &value)
   }
 }
 
+void Value::set_isnull()
+{
+  isnull_ = true;
+}
+
+void Value::set_isnotnull()
+{
+  isnull_ = false;
+}
+
 const char *Value::data() const
 {
   switch (attr_type_) {
@@ -176,6 +186,12 @@ const char *Value::data() const
 std::string Value::to_string() const
 {
   std::string res;
+
+  // return null is the value is null
+  if(get_isnull()){
+    return "NULL";
+  }
+  
   switch (attr_type_) {
     case INTS: {
       res = std::to_string(num_value_.int_value_);
@@ -206,6 +222,14 @@ std::string Value::to_string() const
 
 int Value::compare(const Value &other) const
 {
+  // return false when any value is NULL
+  if(isnull_ & other.get_isnull())
+    return 0;
+  else if (isnull_)
+    return -1;
+  else if (other.get_isnull())
+    return 1;
+
   if (this->attr_type_ == other.attr_type_) {
     switch (this->attr_type_) {
       case DATES:
@@ -393,6 +417,11 @@ bool Value::get_boolean() const
     }
   }
   return false;
+}
+
+bool Value::get_isnull() const
+{
+  return isnull_; 
 }
 
 int returnPrefixNum(const char *str, int &val)

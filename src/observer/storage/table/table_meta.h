@@ -60,6 +60,8 @@ public:
   int              index_num() const;
 
   int record_size() const;
+  int null_bitmap_offset() const;
+  int null_bitmap_size() const;
 
 public:
   int  serialize(std::ostream &os) const override;
@@ -75,4 +77,6 @@ protected:
   std::vector<IndexMeta> indexes_;
 
   int record_size_ = 0;
+  int null_bitmap_offset_ = 0;
+  int null_bitmap_size_ = 0;
 };

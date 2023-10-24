@@ -104,6 +104,8 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         DATA
         INFILE
         EXPLAIN
+        IS
+        NULL_TOKEN
         EQ
         LT
         GT
@@ -356,12 +358,49 @@ attr_def_list:
     ;
     
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID type LBRACE number RBRACE NULL_TOKEN
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
+      $$->nullable = true;
+      free($1);
+    }
+    | ID type LBRACE number RBRACE NOT NULL_TOKEN
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = $4;
+      $$->nullable = false;
+      free($1);
+    }
+    | ID type LBRACE number RBRACE 
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = $4;
+      $$->nullable = false;
+      free($1);
+    }
+    | ID type NULL_TOKEN
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = 4;
+      $$->nullable = true;
+      free($1);
+    }
+    | ID type NOT NULL_TOKEN
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = 4;
+      $$->nullable = false;
       free($1);
     }
     | ID type
@@ -370,6 +409,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
+      $$->nullable = false;
       free($1);
     }
     ;
@@ -455,6 +495,10 @@ value:
       char *tmp = common::substr($1,1,strlen($1)-2);
       $$ = new Value(tmp);
       free(tmp);
+    }
+    | NULL_TOKEN {
+      $$ = new Value();
+      $$->set_isnull();
     }
     ;
     
@@ -893,6 +937,36 @@ condition:
       $$->right_is_attr = 0;
       $$->right_value = *$4;
       $$->comp = CompOp::NOT_LIKE_OP;
+    }
+    | rel_attr IS NULL_TOKEN
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 1;
+      $$->left_attr = *$1;
+      $$->comp = CompOp::IS_NULL;
+    }
+    | rel_attr IS NOT NULL_TOKEN
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 1;
+      $$->left_attr = *$1;
+      $$->comp = CompOp::IS_NOT_NULL;
+    }
+    | value IS NULL_TOKEN
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 0;
+      $$->right_is_attr = 0;
+      $$->left_value = *$1;
+      $$->comp = CompOp::IS_NULL;
+    }
+    | value IS NOT NULL_TOKEN
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 0;
+      $$->right_is_attr = 0;
+      $$->left_value = *$1;
+      $$->comp = CompOp::IS_NOT_NULL;
     }
     ;
 
