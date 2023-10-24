@@ -58,6 +58,7 @@ public:
   const IndexMeta *find_index_by_field(const char *field) const;
   const IndexMeta *index(int i) const;
   int              index_num() const;
+  int              field_index(const char *name) const;
 
   int record_size() const;
   int null_bitmap_offset() const;
