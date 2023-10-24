@@ -17,19 +17,33 @@ See the Mulan PSL v2 for more details. */
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
 
-IndexScanPhysicalOperator::IndexScanPhysicalOperator(Table *table, Index *index, bool readonly, const Value *left_value,
-    bool left_inclusive, const Value *right_value, bool right_inclusive)
+IndexScanPhysicalOperator::IndexScanPhysicalOperator(Table *table, Index *index, bool readonly,
+    std::vector<ValueExpr *> &left, std::vector<ValueExpr *> &right, bool left_inclusive /*true*/,
+    bool right_inclusive /*true*/)
     : table_(table),
       index_(index),
       readonly_(readonly),
       left_inclusive_(left_inclusive),
       right_inclusive_(right_inclusive)
 {
-  if (left_value) {
-    left_value_ = *left_value;
+  left_length_ = 0, right_length_ = 0;
+  for (auto l : left) {
+    left_length_ += l->get_value().length();
   }
-  if (right_value) {
-    right_value_ = *right_value;
+  for (auto r : right) {
+    right_length_ += r->get_value().length();
+  }
+  left_value_  = new char[left_length_];
+  right_value_ = new char[right_length_];
+  int offset   = 0;
+  for (auto l : left) {
+    memcpy(left_value_ + offset, l->get_value().data(), l->get_value().length());
+    offset += l->get_value().length();
+  }
+  offset = 0;
+  for (auto r : right) {
+    memcpy(right_value_ + offset, r->get_value().data(), r->get_value().length());
+    offset += r->get_value().length();
   }
 }
 
@@ -39,12 +53,8 @@ RC IndexScanPhysicalOperator::open(Trx *trx)
     return RC::INTERNAL;
   }
 
-  IndexScanner *index_scanner = index_->create_scanner(left_value_.data(),
-      left_value_.length(),
-      left_inclusive_,
-      right_value_.data(),
-      right_value_.length(),
-      right_inclusive_);
+  IndexScanner *index_scanner =
+      index_->create_scanner(left_value_, left_length_, left_inclusive_, right_value_, right_length_, right_inclusive_);
   if (nullptr == index_scanner) {
     return RC::INTERNAL;
   }
@@ -66,51 +76,54 @@ RC IndexScanPhysicalOperator::next()
   RID rid;
   RC  rc = RC::SUCCESS;
 
-  record_page_handler_.cleanup();
+  if (pos == -1) {
+    while (RC::SUCCESS == (rc = index_scanner_->next_entry(&rid))) {
+      record_page_handler_.cleanup();
+      rc = record_handler_->get_record(record_page_handler_, &rid, readonly_, &current_record_);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
 
-  bool filter_result = false;
-  while (RC::SUCCESS == (rc = index_scanner_->next_entry(&rid))) {
-    rc = record_handler_->get_record(record_page_handler_, &rid, readonly_, &current_record_);
-    if (rc != RC::SUCCESS) {
-      return rc;
-    }
+      auto tuple = new RowTuple();
+      tuple->set_schema(table_, table_->table_meta().field_metas());
+      tuple->set_record(current_record_);
 
-    auto tuple = new RowTuple();
-    tuple->set_schema(table_, table_->table_meta().field_metas());
-    tuple->set_record(current_record_);
-    rc = filter(*tuple, filter_result);
-    if (rc != RC::SUCCESS) {
-      delete tuple;
-      return rc;
-    }
+      // do filter
+      bool filter_result = false;
+      rc                 = filter(*tuple, filter_result);
+      if (rc != RC::SUCCESS) {
+        delete tuple;
+        return rc;
+      }
+      if (!filter_result) {
+        delete tuple;
+        continue;
+      }
 
-    if (!filter_result) {
-      delete tuple;
-      continue;
-    }
-
-    rc = trx_->visit_record(table_, current_record_, readonly_);
-    if (rc == RC::RECORD_INVISIBLE) {
-      delete tuple;
-      continue;
-    } else {
-      tuples_.push_back(tuple);
-      return rc;
+      rc = trx_->visit_record(table_, current_record_, readonly_);
+      if (rc == RC::RECORD_INVISIBLE) {
+        delete tuple;
+        continue;
+      } else {
+        tuples_.push_back(tuple);
+      }
     }
   }
-
-  return rc;
+  pos++;
+  return pos == tuples_.size() ? RC::RECORD_EOF : RC::SUCCESS;
 }
 
 RC IndexScanPhysicalOperator::close()
 {
+  delete right_value_;
+  delete left_value_;
   if (index_scanner_ != nullptr)
     index_scanner_->destroy();
   index_scanner_ = nullptr;
   return RC::SUCCESS;
 }
 
-Tuple *IndexScanPhysicalOperator::current_tuple() { return tuples_.back(); }
+Tuple *IndexScanPhysicalOperator::current_tuple() { return tuples_[pos]; }
 
 void IndexScanPhysicalOperator::set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs)
 {

@@ -167,6 +167,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <relation_list>       rel_list
 %type <rel_attr_list>       aggr_list
 %type <rel_attr_list>       attr_list
+%type <relation_list>       index_field_list
 %type <order_by_attr>       order_by_node
 %type <order_by_attr_list>  order_by_node_list
 %type <order_by_attr_list>  order_by
@@ -297,18 +298,38 @@ desc_table_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE ID RBRACE
+    CREATE INDEX ID ON ID LBRACE ID index_field_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
       create_index.index_name = $3;
       create_index.relation_name = $5;
-      create_index.attribute_name = $7;
+      if($8 != nullptr){
+        create_index.attribute_names.swap(*$8);
+        free($8);
+      }
+      create_index.attribute_names.push_back($7);
+      std::reverse(create_index.attribute_names.begin(), create_index.attribute_names.end());
       free($3);
       free($5);
       free($7);
     }
     ;
+
+index_field_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA ID index_field_list
+    {
+      if($3 != nullptr){
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::string>;
+      }
+      $$->push_back($2);
+    }
 
 drop_index_stmt:      /*drop index 语句的语法解析树*/
     DROP INDEX ID ON ID

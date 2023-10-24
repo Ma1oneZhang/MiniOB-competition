@@ -77,14 +77,14 @@ public:
    */
   virtual RC sync() = 0;
 
-  virtual RC drop(const char* base_dir, const char* table_name) = 0;
+  virtual RC drop(const char *base_dir, const char *table_name) = 0;
 
 protected:
-  RC init(const IndexMeta &index_meta, const FieldMeta &field_meta);
+  RC init(const IndexMeta &index_meta, std::vector<const FieldMeta *> const &field_meta);
 
 protected:
-  IndexMeta index_meta_;  ///< 索引的元数据
-  FieldMeta field_meta_;  ///< 当前实现仅考虑一个字段的索引
+  IndexMeta                      index_meta_;  ///< 索引的元数据
+  std::vector<const FieldMeta *> field_meta_;  ///< 当前实现仅考虑一个字段的索引
 };
 
 /**

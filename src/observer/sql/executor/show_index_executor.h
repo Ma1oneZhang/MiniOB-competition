@@ -63,7 +63,7 @@ public:
           std::to_string(1),                                  // Non_unique
           index_meta->name(),                                 // Key_name
           std::to_string(1),                                  // Seq_in_index
-          std::string(index_meta->field())});                 // Column_name
+          std::string(index_meta->name())});                  // Column_name
     }
 
     sql_result->set_operator(std::unique_ptr<PhysicalOperator>(oper));

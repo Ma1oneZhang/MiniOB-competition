@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 // Created by Wangyunlai on 2022/12/14.
 //
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -108,8 +109,9 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
   // 看看是否有可以用于索引查找的表达式
   Table *table = table_get_oper.table();
 
-  Index     *index      = nullptr;
-  ValueExpr *value_expr = nullptr;
+  Index                    *index = nullptr;
+  std::vector<ValueExpr *>  value_exprs{};
+  std::vector<const char *> field_names;
   for (auto &expr : predicates) {
     if (expr->type() == ExprType::COMPARISON) {
       auto comparison_expr = static_cast<ComparisonExpr *>(expr.get());
@@ -129,11 +131,11 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
       if (left_expr->type() == ExprType::FIELD) {
         ASSERT(right_expr->type() == ExprType::VALUE, "right expr should be a value expr while left is field expr");
         field_expr = static_cast<FieldExpr *>(left_expr.get());
-        value_expr = static_cast<ValueExpr *>(right_expr.get());
+        value_exprs.push_back(static_cast<ValueExpr *>(right_expr.get()));
       } else if (right_expr->type() == ExprType::FIELD) {
         ASSERT(left_expr->type() == ExprType::VALUE, "left expr should be a value expr while right is a field expr");
         field_expr = static_cast<FieldExpr *>(right_expr.get());
-        value_expr = static_cast<ValueExpr *>(left_expr.get());
+        value_exprs.push_back(static_cast<ValueExpr *>(left_expr.get()));
       }
 
       if (field_expr == nullptr) {
@@ -141,19 +143,18 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
       }
 
       const Field &field = field_expr->field();
-      index              = table->find_index_by_field(field.field_name());
+      field_names.push_back(field.field_name());
       if (nullptr != index) {
         break;
       }
     }
   }
-
+  std::reverse(field_names.begin(), field_names.end());
+  index = table->find_index_by_field(field_names);
   if (index != nullptr) {
-    ASSERT(value_expr != nullptr, "got an index but value expr is null ?");
-
-    const Value               &value           = value_expr->get_value();
-    IndexScanPhysicalOperator *index_scan_oper = new IndexScanPhysicalOperator(
-        table, index, table_get_oper.readonly(), &value, true /*left_inclusive*/, &value, true /*right_inclusive*/);
+    // ASSERT(value_expr != nullptr, "got an index but value expr is null ?");
+    IndexScanPhysicalOperator *index_scan_oper =
+        new IndexScanPhysicalOperator(table, index, table_get_oper.readonly(), value_exprs, value_exprs);
 
     index_scan_oper->set_predicates(std::move(predicates));
     oper = unique_ptr<PhysicalOperator>(index_scan_oper);
