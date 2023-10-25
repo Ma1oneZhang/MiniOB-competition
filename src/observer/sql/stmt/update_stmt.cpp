@@ -39,6 +39,10 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     bool  match = false;
     for (auto iter = fields->begin(); iter != fields->end(); iter++) {
       if (field == iter->name()) {
+        if(value.get_isnull()) {
+          match = true;
+          break;
+        }
         if (iter->type() == value.attr_type()) {
           // we only need match one of field
           match = true;

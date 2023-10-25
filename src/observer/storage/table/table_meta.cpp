@@ -27,9 +27,11 @@ static const Json::StaticString FIELD_TABLE_ID("table_id");
 static const Json::StaticString FIELD_TABLE_NAME("table_name");
 static const Json::StaticString FIELD_FIELDS("fields");
 static const Json::StaticString FIELD_INDEXES("indexes");
+static const Json::StaticString NULL_BITMAP_OFFSET("null_bitmap_offset");
+static const Json::StaticString NULL_BITMAP_SIZE("null_bitmap_size");
 
 TableMeta::TableMeta(const TableMeta &other)
-    : name_(other.name_), fields_(other.fields_), indexes_(other.indexes_), record_size_(other.record_size_)
+    : name_(other.name_), fields_(other.fields_), indexes_(other.indexes_), record_size_(other.record_size_), null_bitmap_size_(other.null_bitmap_size_), null_bitmap_offset_(other.null_bitmap_offset_)
 {}
 
 void TableMeta::swap(TableMeta &other) noexcept
@@ -38,6 +40,8 @@ void TableMeta::swap(TableMeta &other) noexcept
   fields_.swap(other.fields_);
   indexes_.swap(other.indexes_);
   std::swap(record_size_, other.record_size_);
+  std::swap(null_bitmap_size_, other.null_bitmap_size_);
+  std::swap(null_bitmap_offset_, other.null_bitmap_offset_);
 }
 
 RC TableMeta::init(int32_t table_id, const char *name, int field_num, const AttrInfoSqlNode attributes[])
@@ -57,6 +61,13 @@ RC TableMeta::init(int32_t table_id, const char *name, int field_num, const Attr
   int                      field_offset  = 0;
   int                      trx_field_num = 0;
   const vector<FieldMeta> *trx_fields    = TrxKit::instance()->trx_fields();
+
+  // compute the size of bitmap for NULL info
+  null_bitmap_offset_ = field_offset;
+  null_bitmap_size_ = field_num % 8 == 0 ? field_num/8: field_num/8+1;
+  field_offset +=  null_bitmap_size_;
+
+  // header info
   if (trx_fields != nullptr) {
     fields_.resize(field_num + trx_fields->size());
 
@@ -71,10 +82,11 @@ RC TableMeta::init(int32_t table_id, const char *name, int field_num, const Attr
     fields_.resize(field_num);
   }
 
+  // data
   for (int i = 0; i < field_num; i++) {
     const AttrInfoSqlNode &attr_info = attributes[i];
     rc                               = fields_[i + trx_field_num].init(
-        attr_info.name.c_str(), attr_info.type, field_offset, attr_info.length, true /*visible*/);
+        attr_info.name.c_str(), attr_info.type, field_offset, attr_info.length, true /*visible*/, attr_info.nullable);
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;
@@ -129,6 +141,14 @@ const FieldMeta *TableMeta::field(const char *name) const
     }
   }
   return nullptr;
+}
+
+int TableMeta::field_index(const char *name) const {
+  for (int i=0; i<fields_.size(); i++){
+    if(0 == strcmp(fields_[i].name(), name))
+      return i;
+  }
+  return -1;
 }
 
 const FieldMeta *TableMeta::find_field_by_offset(int offset) const
@@ -187,6 +207,10 @@ int TableMeta::index_num() const { return indexes_.size(); }
 
 int TableMeta::record_size() const { return record_size_; }
 
+int TableMeta::null_bitmap_offset() const { return null_bitmap_offset_;}
+
+int TableMeta::null_bitmap_size() const { return null_bitmap_size_;}
+
 int TableMeta::serialize(std::ostream &ss) const
 {
 
@@ -210,6 +234,9 @@ int TableMeta::serialize(std::ostream &ss) const
     indexes_value.append(std::move(index_value));
   }
   table_value[FIELD_INDEXES] = std::move(indexes_value);
+
+  // serialize null bitmap info
+  table_value[NULL_BITMAP_OFFSET] = null_bitmap_offset_;
 
   Json::StreamWriterBuilder builder;
   Json::StreamWriter       *writer = builder.newStreamWriter();
@@ -277,6 +304,15 @@ int TableMeta::deserialize(std::istream &is)
   name_.swap(table_name);
   fields_.swap(fields);
   record_size_ = fields_.back().offset() + fields_.back().len() - fields_.begin()->offset();
+
+  // deserialize null bitmap info
+  const Json::Value &null_bitmap_offset_value = table_value[NULL_BITMAP_OFFSET];
+  if (!null_bitmap_offset_value.isInt()) {
+    LOG_ERROR("Invalid null bitmap offset. json value=%s", null_bitmap_offset_value.toStyledString().c_str());
+    return -1;
+  }
+  null_bitmap_offset_ = null_bitmap_offset_value.asInt();
+  null_bitmap_size_ = field_num % 8 == 0? field_num/8: field_num/8+1;
 
   const Json::Value &indexes_value = table_value[FIELD_INDEXES];
   if (!indexes_value.empty()) {

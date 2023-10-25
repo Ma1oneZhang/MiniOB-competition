@@ -81,6 +81,8 @@ enum CompOp
   GREAT_THAN,   ///< ">"
   LIKE_OP,      ///< "LIKE operation"
   NOT_LIKE_OP,  ///< "NOT LIKE operation"
+  IS_NULL,
+  IS_NOT_NULL,
   NO_OP
 };
 
@@ -198,9 +200,10 @@ struct UpdateValue
  */
 struct AttrInfoSqlNode
 {
-  AttrType    type;    ///< Type of attribute
-  std::string name;    ///< Attribute name
-  size_t      length;  ///< Length of attribute
+  AttrType    type;      ///< Type of attribute
+  std::string name;      ///< Attribute name
+  size_t      length;    ///< Length of attribute
+  bool        nullable;  ///< could this attr be null
 };
 
 /**

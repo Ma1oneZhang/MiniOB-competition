@@ -45,6 +45,22 @@ RC UpdatePhysicalOperator::next()
       auto attr_offset = field->offset();
       ASSERT(attr_len == values_[0].length(), "The data type must have same length");
 
+      // update null bitmap
+      if(field->nullable()){
+        int field_index = table_->table_meta().field_index(attribute_names_->at(i).c_str());
+        int null_bitmap_offset = table_->table_meta().null_bitmap_offset();
+        int null_bitmap_size = table_->table_meta().null_bitmap_size();
+        char null_bitmap = *(record.data() + null_bitmap_offset + null_bitmap_size - 1 - field_index/8);
+        if(values_[i].get_isnull()) {
+          null_bitmap |= (1 << (field_index%8));
+        } else {
+          null_bitmap &= ~(1 << (field_index % 8));
+        }
+        memcpy(record.data() + null_bitmap_offset + null_bitmap_size - 1 - field_index/8, &null_bitmap, 1);
+      } else if (values_[i].get_isnull()) {
+        return RC::FIELD_COULD_NOT_BE_NULL;
+      }
+
       // check the field is same, if is same, we dont need do any thing
       if (memcmp(record.data() + attr_offset, values_[i].data(), attr_len) == 0) {
         // do nothing

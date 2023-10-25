@@ -32,10 +32,21 @@ RC AggregationPhysicalOperator::next()
     }
     for (size_t i = 0; i < fields_.size(); i++) {
       auto &field = fields_[i];
+
+      // fetch value
+      Value value;
+      if(field.meta() != nullptr){
+        tuple->find_cell({field.table_name(), field.meta()->name()}, value);
+        if (value.get_isnull()){
+          continue;
+        }
+      }
+        
+
       switch (field.get_aggr_type()) {
         case AggregationType::MAX: {
-          Value value;
-          tuple->find_cell({field.table_name(), field.meta()->name()}, value);
+          // Value value;
+          // tuple->find_cell({field.table_name(), field.meta()->name()}, value);
           if (result_[i].first) {
             result_[i].max_or_min = value;
             result_[i].first      = false;
@@ -44,8 +55,8 @@ RC AggregationPhysicalOperator::next()
           }
         } break;
         case AggregationType::MIN: {
-          Value value;
-          tuple->find_cell({field.table_name(), field.meta()->name()}, value);
+          // Value value;
+          // tuple->find_cell({field.table_name(), field.meta()->name()}, value);
           if (result_[i].first) {
             result_[i].max_or_min = value;
             result_[i].first      = false;
@@ -54,10 +65,12 @@ RC AggregationPhysicalOperator::next()
           }
         } break;
         case AggregationType::COUNT: {
+          result_[i].first = false;  // indicate there are values not NULL
           result_[i].tot_count_++;
         } break;
         case AggregationType::AVG: {
           // get count
+          result_[i].first = false;  // indicate there are values not NULL
           result_[i].tot_count_++;
           Value value;
           tuple->find_cell({field.table_name(), field.meta()->name()}, value);
@@ -65,6 +78,7 @@ RC AggregationPhysicalOperator::next()
           result_[i].float_sum_ += value.get_float();
         } break;
         case AggregationType::SUM: {
+          result_[i].first = false;  // indicate there are values not NULL
           Value value;
           tuple->find_cell({field.table_name(), field.meta()->name()}, value);
           switch (value.attr_type()) {
@@ -103,11 +117,15 @@ RC AggregationPhysicalOperator::next()
   for (size_t i = 0; i < fields_.size(); i++) {
     tuple_ptr->add_cell_spec(fields_[i].field_name());
     switch (fields_[i].get_aggr_type()) {
-      case AggregationType::MAX: {
-        result.push_back(result_[i].max_or_min);
-      } break;
+      case AggregationType::MAX: 
       case AggregationType::MIN: {
-        result.push_back(result_[i].max_or_min);
+        if (result_[i].first==true){
+          Value value;
+          value.set_isnull();
+          result.push_back(value);
+        } else {
+          result.push_back(result_[i].max_or_min);
+        }
       } break;
       case AggregationType::COUNT: {
         Value res;
@@ -115,17 +133,29 @@ RC AggregationPhysicalOperator::next()
         result.push_back(res);
       } break;
       case AggregationType::AVG: {
-        Value res;
-        res.set_float(result_[i].float_sum_ / result_[i].tot_count_);
-        result.push_back(res);
+        if (result_[i].first==true){
+          Value value;
+          value.set_isnull();
+          result.push_back(value);
+        } else {
+          Value res;
+          res.set_float(result_[i].float_sum_ / result_[i].tot_count_);
+          result.push_back(res);
+        }
       } break;
       case AggregationType::SUM: {
-        Value res;
-        if (result_[i].is_float_sum_)
-          res.set_float(result_[i].float_sum_);
-        else
-          res.set_int(result_[i].int_sum_);
-        result.push_back(res);
+        if (result_[i].first==true){
+          Value value;
+          value.set_isnull();
+          result.push_back(value);
+        } else {
+          Value res;
+          if (result_[i].is_float_sum_)
+            res.set_float(result_[i].float_sum_);
+          else
+            res.set_int(result_[i].int_sum_);
+          result.push_back(res);
+        }
       } break;
       case AggregationType::NONE: {
         LOG_PANIC("WARN AGGR TYPE");

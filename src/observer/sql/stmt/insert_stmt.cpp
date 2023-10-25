@@ -60,6 +60,14 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
           continue;
         }
 
+        // addree the case when the value is null
+        if(tuple[i].get_isnull()) {
+          if(field_meta->nullable()) 
+            continue;
+          else
+            return RC::FIELD_COULD_NOT_BE_NULL;
+        }
+
         if (!tuple[i].match_field_type(field_type)) {
           LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
                 table_name, field_meta->name(), field_type, value_type);

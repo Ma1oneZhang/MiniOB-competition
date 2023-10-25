@@ -71,6 +71,8 @@ public:
   void set_string(const char *s, int len = 0);
   bool set_date(const char *s);
   void set_value(const Value &value);
+  void set_isnull();
+  void set_isnotnull();
 
   std::string to_string() const;
 
@@ -96,11 +98,13 @@ public:
   float get_float() const;
   std::string get_string() const;
   bool get_boolean() const;
+  bool get_isnull() const;
   bool match_field_type(AttrType field_type);
 
 private:
   AttrType attr_type_ = UNDEFINED;
   int length_ = 0;
+  bool isnull_ = false;
 
   union {
     int int_value_;
