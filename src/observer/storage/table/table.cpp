@@ -218,19 +218,39 @@ RC Table::insert_record(Record &record)
     return rc;
   }
 
-  rc = insert_entry_of_indexes(record.data(), record.rid());
-  if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-    RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
-    if (rc2 != RC::SUCCESS) {
-      LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
-    }
-    rc2 = record_handler_->delete_record(&record.rid());
-    if (rc2 != RC::SUCCESS) {
-      LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+  for (int i = 0; i < indexes_.size(); i++) {
+    auto index = indexes_[i];
+    rc = index->insert_entry(record.data(), &record.rid());
+    if (rc != RC::SUCCESS) {  // 可能出现了键值重复
+      for (int j = i - 1; j >= 0; j++) {
+        auto index = indexes_[j];
+        rc = index->delete_entry(record.data(), &record.rid());
+        if (rc != RC::SUCCESS) {
+          LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+                name(), rc, strrc(rc));
+        }
+      }
+      rc = record_handler_->delete_record(&record.rid());
+      if (rc != RC::SUCCESS) {
+        LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+                name(), rc, strrc(rc));
+      }
+      return RC::RECORD_DUPLICATE_KEY;
     }
   }
+  // rc = insert_entry_of_indexes(record.data(), record.rid());
+  // if (rc != RC::SUCCESS) {  // 可能出现了键值重复
+  //   RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
+  //   if (rc2 != RC::SUCCESS) {
+  //     LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+  //               name(), rc2, strrc(rc2));
+  //   }
+  //   rc2 = record_handler_->delete_record(&record.rid());
+  //   if (rc2 != RC::SUCCESS) {
+  //     LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+  //               name(), rc2, strrc(rc2));
+  //   }
+  // }
   return rc;
 }
 
@@ -269,17 +289,23 @@ RC Table::recover_insert_record(Record &record)
     return rc;
   }
 
-  rc = insert_entry_of_indexes(record.data(), record.rid());
-  if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-    RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
-    if (rc2 != RC::SUCCESS) {
-      LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
-    }
-    rc2 = record_handler_->delete_record(&record.rid());
-    if (rc2 != RC::SUCCESS) {
-      LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+  for (int i = 0; i < indexes_.size(); i++) {
+    auto index = indexes_[i];
+    index->insert_entry(record.data(), &record.rid());
+    if (rc != RC::SUCCESS) {
+      for (int j = i - 1; j >= 0; j++) {
+        auto index = indexes_[j];
+        rc         = index->delete_entry(record.data(), &record.rid());
+        if (rc != RC::SUCCESS) {
+          LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+                name(), rc, strrc(rc));
+        }
+      }
+      rc = record_handler_->delete_record(&record.rid());
+      if (rc != RC::SUCCESS) {
+        LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+                name(), rc, strrc(rc));
+      }
     }
   }
   return rc;
@@ -362,7 +388,8 @@ RC Table::get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly
   return rc;
 }
 
-RC Table::create_index(Trx *trx, std::vector<const FieldMeta *> const &field_metas, const char *index_name)
+RC Table::create_index(
+    Trx *trx, std::vector<const FieldMeta *> const &field_metas, const char *index_name, bool is_unique)
 {
   if (common::is_blank(index_name) || 0 == field_metas.size()) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
@@ -370,7 +397,7 @@ RC Table::create_index(Trx *trx, std::vector<const FieldMeta *> const &field_met
   }
 
   IndexMeta new_index_meta;
-  RC        rc = new_index_meta.init(index_name, field_metas);
+  RC        rc = new_index_meta.init(index_name, field_metas, is_unique);
   if (rc != RC::SUCCESS) {
     stringstream ss;
     for (auto i : field_metas) {

@@ -115,12 +115,13 @@ private:
 class KeyComparator
 {
 public:
-  void init(int32_t attr_count, AttrTypeInfo *attr_type_infos)
+  void init(int32_t attr_count, AttrTypeInfo *attr_type_infos, bool is_unique)
   {
     attr_comparators_.resize(attr_count);
     for (int i = 0; i < attr_count; i++) {
       attr_comparators_[i].init(attr_type_infos[i].attr_type, attr_type_infos[i].key_length);
     }
+    this->is_unique_ = is_unique;
   }
 
   int attr_comparator(const char *v1, const char *v2) const
@@ -147,6 +148,8 @@ public:
       offset += cmp.attr_length();
     }
 
+    if (is_unique_)
+      return 0;
     const RID *rid1 = (const RID *)(v1 + offset);
     const RID *rid2 = (const RID *)(v2 + offset);
     return RID::compare(rid1, rid2);
@@ -154,6 +157,7 @@ public:
 
 private:
   std::vector<AttrComparator> attr_comparators_;
+  bool                        is_unique_ = false;
 };
 
 /**
@@ -254,6 +258,7 @@ struct IndexFileHeader
   int32_t      leaf_max_size;      ///< 叶子节点最大的键值对数
   int32_t      tot_attr_length;    ///< 键值的长度
   int32_t      key_length;         ///< attr length + sizeof(RID)
+  bool         is_unique;          ///< 是否为唯一索引
   int32_t      attr_count;
   AttrTypeInfo attr_type_info[10];  ///< 键值的类型
 
@@ -501,7 +506,7 @@ public:
    * 此函数创建一个名为fileName的索引。
    * attrType描述被索引属性的类型，attrLength描述被索引属性的长度
    */
-  RC create(const char *file_name, std::vector<const FieldMeta *> const &, int internal_max_size = -1,
+  RC create(const char *file_name, std::vector<const FieldMeta *> const &, bool, int internal_max_size = -1,
       int leaf_max_size = -1);
 
   /**

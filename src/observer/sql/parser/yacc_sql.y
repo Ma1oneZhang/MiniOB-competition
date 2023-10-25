@@ -69,6 +69,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         DELETE
         UPDATE
         LBRACE
+        UNIQUE
         MAX
         MIN
         COUNT
@@ -302,6 +303,7 @@ create_index_stmt:    /*create index 语句的语法解析树*/
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
+      create_index.is_unique = false;
       create_index.index_name = $3;
       create_index.relation_name = $5;
       if($8 != nullptr){
@@ -313,6 +315,23 @@ create_index_stmt:    /*create index 语句的语法解析树*/
       free($3);
       free($5);
       free($7);
+    }
+    | CREATE UNIQUE INDEX ID ON ID LBRACE ID index_field_list RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+      CreateIndexSqlNode &create_index = $$->create_index;
+      create_index.is_unique = true;
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
+      if($9 != nullptr){
+        create_index.attribute_names.swap(*$9);
+        free($9);
+      }
+      create_index.attribute_names.push_back($8);
+      std::reverse(create_index.attribute_names.begin(), create_index.attribute_names.end());
+      free($4);
+      free($6);
+      free($8);
     }
     ;
 

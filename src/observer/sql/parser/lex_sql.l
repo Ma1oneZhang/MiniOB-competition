@@ -94,6 +94,7 @@ ON                                      RETURN_TOKEN(ON);
 SHOW                                    RETURN_TOKEN(SHOW);
 SYNC                                    RETURN_TOKEN(SYNC);
 SELECT                                  RETURN_TOKEN(SELECT);
+UNIQUE                                  RETURN_TOKEN(UNIQUE);
 COUNT                                   RETURN_TOKEN(COUNT);
 MAX                                     RETURN_TOKEN(MAX);
 MIN                                     RETURN_TOKEN(MIN);

@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "sql/parser/parse_defs.h"
 #include "common/lang/lower_bound.h"
+#include <algorithm>
 
 using namespace std;
 using namespace common;
@@ -52,11 +53,11 @@ void IndexNodeHandler::init_empty(bool leaf)
 }
 PageNum IndexNodeHandler::page_num() const { return page_num_; }
 
-int IndexNodeHandler::key_size() const { return header_.key_length; }
+int IndexNodeHandler::key_size() const { return header_.tot_attr_length; }
 
 int IndexNodeHandler::value_size() const
 {
-  // return header_.value_size;
+  // return header_.tot_attr_length;
   return sizeof(RID);
 }
 
@@ -684,7 +685,7 @@ RC BplusTreeHandler::sync()
   return disk_buffer_pool_->flush_all_pages();
 }
 
-RC BplusTreeHandler::create(const char *file_name, std::vector<const FieldMeta *> const &fields,
+RC BplusTreeHandler::create(const char *file_name, std::vector<const FieldMeta *> const &fields, bool is_unique,
     int internal_max_size /* = -1*/, int leaf_max_size /* = -1 */)
 {
   BufferPoolManager &bpm = BufferPoolManager::instance();
@@ -740,7 +741,7 @@ RC BplusTreeHandler::create(const char *file_name, std::vector<const FieldMeta *
     file_header->attr_type_info[i].attr_type  = fields[i]->type();
     file_header->attr_type_info[i].key_length = fields[i]->len();
   }
-
+  file_header->is_unique = true;
   header_frame->mark_dirty();
 
   disk_buffer_pool_ = bp;
@@ -756,7 +757,7 @@ RC BplusTreeHandler::create(const char *file_name, std::vector<const FieldMeta *
     return RC::NOMEM;
   }
 
-  key_comparator_.init(file_header->attr_count, file_header->attr_type_info);
+  key_comparator_.init(file_header->attr_count, file_header->attr_type_info, file_header_.is_unique);
   key_printer_.init(file_header->attr_count, file_header->attr_type_info);
   LOG_INFO("Successfully create index %s", file_name);
   return RC::SUCCESS;
@@ -799,8 +800,7 @@ RC BplusTreeHandler::open(const char *file_name)
 
   // close old page_handle
   disk_buffer_pool->unpin_page(frame);
-
-  key_comparator_.init(file_header_.attr_count, file_header_.attr_type_info);
+  key_comparator_.init(file_header_.attr_count, file_header_.attr_type_info, file_header_.is_unique);
   key_printer_.init(file_header_.attr_count, file_header_.attr_type_info);
   LOG_INFO("Successfully open index %s", file_name);
   return RC::SUCCESS;
@@ -1631,7 +1631,7 @@ RC BplusTreeScanner::open(const char *left_user_key, int left_len, bool left_inc
     char *fixed_left_key = const_cast<char *>(left_user_key);
     //
     // ** we dont need below code because we already make fixed key**
-    // 
+    //
     // if (tree_handler_.file_header_.attr_type == CHARS) {
     //   bool should_inclusive_after_fix = false;
     //   rc = fix_user_key(left_user_key, left_len, true /*greater*/, &fixed_left_key, &should_inclusive_after_fix);

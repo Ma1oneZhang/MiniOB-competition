@@ -83,7 +83,7 @@ public:
   RC recover_insert_record(Record &record);
 
   // TODO refactor
-  RC create_index(Trx *trx, std::vector<const FieldMeta *> const &, const char *index_name);
+  RC create_index(Trx *trx, std::vector<const FieldMeta *> const &, const char *index_name, bool is_unique);
   RC drop_index(const char *index_name);
 
   RC get_record_scanner(RecordFileScanner &scanner, Trx *trx, bool readonly);

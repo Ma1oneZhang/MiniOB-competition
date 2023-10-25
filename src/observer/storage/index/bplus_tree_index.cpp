@@ -36,7 +36,7 @@ RC BplusTreeIndex::create(
 
   Index::init(index_meta, field_metas);
 
-  RC rc = index_handler_.create(file_name, field_metas);
+  RC rc = index_handler_.create(file_name, field_metas, index_meta.is_unique());
   if (RC::SUCCESS != rc) {
     stringstream ss;
     index_meta.desc(ss);
