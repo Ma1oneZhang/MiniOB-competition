@@ -222,7 +222,7 @@ RC Table::insert_record(Record &record)
     auto index = indexes_[i];
     rc = index->insert_entry(record.data(), &record.rid());
     if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-      for (int j = i - 1; j >= 0; j++) {
+      for (int j = i - 1; j >= 0; j--) {
         auto index = indexes_[j];
         rc = index->delete_entry(record.data(), &record.rid());
         if (rc != RC::SUCCESS) {
@@ -293,7 +293,7 @@ RC Table::recover_insert_record(Record &record)
     auto index = indexes_[i];
     index->insert_entry(record.data(), &record.rid());
     if (rc != RC::SUCCESS) {
-      for (int j = i - 1; j >= 0; j++) {
+      for (int j = i - 1; j >= 0; j--) {
         auto index = indexes_[j];
         rc         = index->delete_entry(record.data(), &record.rid());
         if (rc != RC::SUCCESS) {
