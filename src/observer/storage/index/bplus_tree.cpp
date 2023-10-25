@@ -741,7 +741,7 @@ RC BplusTreeHandler::create(const char *file_name, std::vector<const FieldMeta *
     file_header->attr_type_info[i].attr_type  = fields[i]->type();
     file_header->attr_type_info[i].key_length = fields[i]->len();
   }
-  file_header->is_unique = true;
+  file_header->is_unique = is_unique;
   header_frame->mark_dirty();
 
   disk_buffer_pool_ = bp;
