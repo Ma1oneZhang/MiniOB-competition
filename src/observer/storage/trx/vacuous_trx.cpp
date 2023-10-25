@@ -38,10 +38,10 @@ RC VacuousTrx::insert_record(Table *table, Record &record) { return table->inser
 
 RC VacuousTrx::insert_records(Table *table, std::vector<Record> &records)
 {
-  for (size_t i = 0; i < records.size(); i++) {
+  for (int i = 0; i < records.size(); i++) {
     auto rc = insert_record(table, records[i]);
     if (rc != RC::SUCCESS) {
-      for (size_t j = i - 1; j >= 0; j--) {
+      for (int j = i - 1; j >= 0; j--) {
         delete_record(table, records[j]);
       }
       return rc;

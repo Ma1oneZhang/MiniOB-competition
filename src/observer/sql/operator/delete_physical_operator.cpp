@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/log/log.h"
 #include "sql/operator/delete_physical_operator.h"
+#include "sql/expr/tuple.h"
 #include "storage/record/record.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
@@ -45,16 +46,18 @@ RC DeletePhysicalOperator::next()
   }
 
   PhysicalOperator *child = children_[0].get();
+  std::vector<RowTuple *> tuples;
   while (RC::SUCCESS == (rc = child->next())) {
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
       LOG_WARN("failed to get current record: %s", strrc(rc));
       return rc;
     }
-
-    RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
-    Record &record = row_tuple->record();
-    rc = trx_->delete_record(table_, record);
+    tuples.push_back(static_cast<RowTuple *>(tuple));
+  }
+  for (auto row_tuple : tuples) {
+    Record   &record    = row_tuple->record();
+    rc                  = trx_->delete_record(table_, record);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to delete record: %s", strrc(rc));
       return rc;

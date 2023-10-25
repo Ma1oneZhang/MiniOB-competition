@@ -25,16 +25,12 @@ See the Mulan PSL v2 for more details. */
 class IndexScanPhysicalOperator : public PhysicalOperator
 {
 public:
-  IndexScanPhysicalOperator(Table *table, Index *index, bool readonly, 
-      const Value *left_value, bool left_inclusive,
-      const Value *right_value, bool right_inclusive);
+  IndexScanPhysicalOperator(Table *table, Index *index, bool readonly, std::vector<ValueExpr *> &left_value,
+      std::vector<ValueExpr *> &right_value, bool left_inclusive = true, bool right_inclusive = true);
 
   virtual ~IndexScanPhysicalOperator() = default;
 
-  PhysicalOperatorType type() const override
-  {
-    return PhysicalOperatorType::INDEX_SCAN;
-  }
+  PhysicalOperatorType type() const override { return PhysicalOperatorType::INDEX_SCAN; }
 
   std::string param() const override;
 
@@ -51,21 +47,24 @@ private:
   RC filter(RowTuple &tuple, bool &result);
 
 private:
-  Trx * trx_ = nullptr;
-  Table *table_ = nullptr;
-  Index *index_ = nullptr;
-  bool readonly_ = false;
-  IndexScanner *index_scanner_ = nullptr;
+  Trx               *trx_            = nullptr;
+  Table             *table_          = nullptr;
+  Index             *index_          = nullptr;
+  bool               readonly_       = false;
+  IndexScanner      *index_scanner_  = nullptr;
   RecordFileHandler *record_handler_ = nullptr;
 
-  RecordPageHandler record_page_handler_;
-  Record current_record_;
+  RecordPageHandler       record_page_handler_;
+  Record                  current_record_;
   std::vector<RowTuple *> tuples_;
 
-  Value left_value_;
-  Value right_value_;
-  bool left_inclusive_ = false;
-  bool right_inclusive_ = false;
+  int pos = -1;
+  char* left_value_;
+  char *right_value_;
+  int32_t left_length_;
+  int32_t right_length_;
+  bool  left_inclusive_  = false;
+  bool  right_inclusive_ = false;
 
   std::vector<std::unique_ptr<Expression>> predicates_;
 };
