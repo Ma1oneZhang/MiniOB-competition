@@ -30,7 +30,6 @@ RC UpdatePhysicalOperator::next()
   }
   PhysicalOperator *child = children_.front().get();
   while (RC::SUCCESS == (rc = child->next())) {
-
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
       LOG_WARN("failed to get current record: %s", strrc(rc));
@@ -66,19 +65,18 @@ RC UpdatePhysicalOperator::next()
       } else if (values_[i].get_isnull()) {
         return RC::FIELD_COULD_NOT_BE_NULL;
       }
-
       // check the field is same, if is same, we dont need do any thing
       if (memcmp(record.data() + attr_offset, values_[i].data(), attr_len) == 0) {
         // do nothing
         continue;
       } else {
         memcpy((record.data() + attr_offset), values_[i].data(), attr_len);
-        rc = trx_->update_record(table_, old_record, record);
       }
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("failed to update record: %s", strrc(rc));
-        return rc;
-      }
+    }
+    rc = trx_->update_record(table_, old_record, record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to update record: %s", strrc(rc));
+      return rc;
     }
   }
   return RC::RECORD_EOF;
