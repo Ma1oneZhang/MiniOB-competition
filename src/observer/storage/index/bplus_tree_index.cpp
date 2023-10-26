@@ -108,14 +108,14 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 
   // make fixed key
   int key_length{};
-  for (auto field : field_meta_) {
-    key_length += field->len();
+  for (auto &field : field_meta_) {
+    key_length += field.len();
   }
   auto data  = make_unique<char>(key_length);
   key_length = 0;
-  for (auto field : field_meta_) {
-    memcpy(data.get() + key_length, record + field->offset(), field->len());
-    key_length += field->len();
+  for (auto &field : field_meta_) {
+    memcpy(data.get() + key_length, record + field.offset(), field.len());
+    key_length += field.len();
   }
   auto rc = index_handler_.insert_entry(data.get(), rid);
   return rc;
@@ -125,14 +125,14 @@ RC BplusTreeIndex::delete_entry(const char *record, const RID *rid)
 {
   // make fixed key
   int key_length{};
-  for (auto field : field_meta_) {
-    key_length += field->len();
+  for (auto &field : field_meta_) {
+    key_length += field.len();
   }
   auto data  = make_unique<char>(key_length);
   key_length = 0;
-  for (auto field : field_meta_) {
-    memcpy(data.get() + key_length, record + field->offset(), field->len());
-    key_length += field->len();
+  for (auto &field : field_meta_) {
+    memcpy(data.get() + key_length, record + field.offset(), field.len());
+    key_length += field.len();
   }
   auto rc = index_handler_.delete_entry(data.get(), rid);
   return rc;
