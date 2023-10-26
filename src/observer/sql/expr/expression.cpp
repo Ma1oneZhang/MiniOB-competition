@@ -102,9 +102,16 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
     case CompOp::IS_NOT_NULL: {
       result = !(left.get_isnull());
       return rc;
-    }break;
+    } break;
+    default:
+      break;
   }
-
+  if (comp_ == CompOp::EQUAL_TO) {
+    if (left.get_isnull() && right.get_isnull()) {
+      result = true;
+      return rc;
+    }
+  }
   if(left.get_isnull() | right.get_isnull()) {
     result = false;
     return rc;

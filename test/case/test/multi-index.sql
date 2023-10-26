@@ -1,5 +1,7 @@
-CREATE TABLE unique_table2(id1 int, id2 int, col1 int, col2 int);
-INSERT INTO unique_table2 VALUES (1,1,1,1);
+CREATE TABLE null_table(id int not null, num int null, price float not null, birthday date null);
+CREATE TABLE null_table2(id int not null, num int null, price float not null, birthday date null);
+CREATE INDEX index_num on null_table(num);
+insert into null_table VALUES (5, 6, 44.30, '2001-01-10');
+insert into null_table VALUES (5, 8, 25.59, '2016-12-04');
 
-CREATE UNIQUE INDEX index_id on unique_table2(id2);
-UPDATE unique_table2 SET id1=1,id2=4 where id2=2;
+SELECT * FROM null_table where num = null; 
