@@ -345,7 +345,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   int   null_bitmap_offset = table_meta_.null_bitmap_offset();
   int   null_bitmap_size = table_meta_.null_bitmap_size();
   char  null_bitmap[null_bitmap_size];
-
+  memset(null_bitmap, 0, null_bitmap_size);
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field    = table_meta_.field(i + normal_field_start_index);
     const Value     &value    = values[i];
