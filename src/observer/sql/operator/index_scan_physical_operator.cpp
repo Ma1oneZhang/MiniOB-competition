@@ -37,12 +37,22 @@ IndexScanPhysicalOperator::IndexScanPhysicalOperator(Table *table, Index *index,
   right_value_ = new char[right_length_];
   int offset   = 0;
   for (auto l : left) {
-    memcpy(left_value_ + offset, l->get_value().data(), l->get_value().length());
+    if (l->get_value().get_isnull()) {
+      // magic number 0x7F
+      memset(left_value_ + offset, 0x7F, l->get_value().length());
+    } else {
+      memcpy(left_value_ + offset, l->get_value().data(), l->get_value().length());
+    }
     offset += l->get_value().length();
   }
   offset = 0;
   for (auto r : right) {
-    memcpy(right_value_ + offset, r->get_value().data(), r->get_value().length());
+    if (r->get_value().get_isnull()) {
+      // magic number 0x7F
+      memset(right_value_ + offset, 0x7F, r->get_value().length());
+    } else {
+      memcpy(right_value_ + offset, r->get_value().data(), r->get_value().length());
+    }
     offset += r->get_value().length();
   }
 }

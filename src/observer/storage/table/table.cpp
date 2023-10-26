@@ -364,7 +364,12 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         copy_len = data_len + 1;
       }
     }
-    memcpy(record_data + field->offset(), value.data(), copy_len);
+    if (value.get_isnull()) {
+      // magic number 0x7F
+      memset(record_data + field->offset(), 0x7f, copy_len);
+    } else {
+      memcpy(record_data + field->offset(), value.data(), copy_len);
+    }
   }
 
   memcpy(record_data+null_bitmap_offset, null_bitmap, null_bitmap_size);
