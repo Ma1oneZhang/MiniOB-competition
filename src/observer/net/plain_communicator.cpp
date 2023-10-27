@@ -176,6 +176,8 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     return write_state(event, need_disconnect);
   }
 
+  string output_str;
+
   rc = sql_result->open();
   if (OB_FAIL(rc)) {
     sql_result->close();
@@ -192,31 +194,34 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     if (nullptr != alias || alias[0] != 0) {
       if (0 != i) {
         const char *delim = " | ";
-        rc                = writer_->writen(delim, strlen(delim));
-        if (OB_FAIL(rc)) {
-          LOG_WARN("failed to send data to client. err=%s", strerror(errno));
-          return rc;
-        }
+        output_str += delim;
+        // rc                = writer_->writen(delim, strlen(delim));
+        // if (OB_FAIL(rc)) {
+        //   LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+        //   return rc;
+        // }
       }
 
-      int len = strlen(alias);
-      rc      = writer_->writen(alias, len);
-      if (OB_FAIL(rc)) {
-        LOG_WARN("failed to send data to client. err=%s", strerror(errno));
-        sql_result->close();
-        return rc;
-      }
+      output_str += alias;
+      // int len = strlen(alias);
+      // rc      = writer_->writen(alias, len);
+      // if (OB_FAIL(rc)) {
+      //   LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+      //   sql_result->close();
+      //   return rc;
+      // }
     }
   }
 
   if (cell_num > 0) {
     char newline = '\n';
-    rc           = writer_->writen(&newline, 1);
-    if (OB_FAIL(rc)) {
-      LOG_WARN("failed to send data to client. err=%s", strerror(errno));
-      sql_result->close();
-      return rc;
-    }
+    output_str += newline;
+    // rc           = writer_->writen(&newline, 1);
+    // if (OB_FAIL(rc)) {
+    //   LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+    //   sql_result->close();
+    //   return rc;
+    // }
   }
 
   rc           = RC::SUCCESS;
@@ -228,12 +233,13 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     for (int i = 0; i < cell_num; i++) {
       if (i != 0) {
         const char *delim = " | ";
-        rc                = writer_->writen(delim, strlen(delim));
-        if (OB_FAIL(rc)) {
-          LOG_WARN("failed to send data to client. err=%s", strerror(errno));
-          sql_result->close();
-          return rc;
-        }
+        output_str += delim;
+        // rc                = writer_->writen(delim, strlen(delim));
+        // if (OB_FAIL(rc)) {
+        //   LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+        //   sql_result->close();
+        //   return rc;
+        // }
       }
 
       Value value;
@@ -244,25 +250,37 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
       }
 
       std::string cell_str = value.to_string();
-      rc                   = writer_->writen(cell_str.data(), cell_str.size());
-      if (OB_FAIL(rc)) {
-        LOG_WARN("failed to send data to client. err=%s", strerror(errno));
-        sql_result->close();
-        return rc;
-      }
+      output_str.append(cell_str);
+      // rc                   = writer_->writen(cell_str.data(), cell_str.size());
+      // if (OB_FAIL(rc)) {
+      //   LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+      //   sql_result->close();
+      //   return rc;
+      // }
     }
 
     char newline = '\n';
-    rc           = writer_->writen(&newline, 1);
+    output_str += newline;
+    // rc           = writer_->writen(&newline, 1);
+    // if (OB_FAIL(rc)) {
+    //   LOG_WARN("failed to send data to client. err=%s", strerror(errno));
+    //   sql_result->close();
+    //   return rc;
+    // }
+  } 
+  
+  if (rc == RC::RECORD_EOF) {
+    rc = RC::SUCCESS;
+    rc = writer_->writen(output_str.data(), output_str.length());
     if (OB_FAIL(rc)) {
       LOG_WARN("failed to send data to client. err=%s", strerror(errno));
       sql_result->close();
       return rc;
     }
-  }
-
-  if (rc == RC::RECORD_EOF) {
-    rc = RC::SUCCESS;
+  } else {
+    sql_result->close();
+    sql_result->set_return_code(rc);
+    return write_state(event, need_disconnect);
   }
 
   if (cell_num == 0) {
