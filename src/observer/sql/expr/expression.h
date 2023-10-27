@@ -21,6 +21,13 @@ See the Mulan PSL v2 for more details. */
 #include "storage/field/field.h"
 #include "sql/parser/value.h"
 #include "common/log/log.h"
+#include "sql/operator/logical_operator.h"
+#include "sql/operator/physical_operator.h"
+
+using namespace std;
+
+class LogicalOperator;
+// class PhysicalOperator;
 
 class Tuple;
 
@@ -43,6 +50,8 @@ enum class ExprType
   COMPARISON,   ///< 需要做比较的表达式
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
+  SUB_QUERY,    ///< 子查询
+  VALUELIST     ///< 多个常量值
 };
 
 /**
@@ -65,7 +74,7 @@ public:
   /**
    * @brief 根据具体的tuple，来计算当前表达式的值。tuple有可能是一个具体某个表的行数据
    */
-  virtual RC get_value(const Tuple &tuple, Value &value) const = 0;
+  virtual RC get_value(const Tuple &tuple, Value &value) = 0;
 
   /**
    * @brief 在没有实际运行的情况下，也就是无法获取tuple的情况下，尝试获取表达式的值
@@ -119,7 +128,7 @@ public:
 
   const char *field_name() const { return field_.field_name(); }
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple, Value &value) override;
 
 private:
   Field field_;
@@ -137,7 +146,7 @@ public:
 
   virtual ~ValueExpr() = default;
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple, Value &value) override;
   RC try_get_value(Value &value) const override
   {
     value = value_;
@@ -156,6 +165,72 @@ private:
   Value value_;
 };
 
+class ValueListExpr : public Expression
+{
+public:
+  ValueListExpr() = default;
+  explicit ValueListExpr(vector<Value> vl) : value_list_(vl) {}
+
+  virtual ~ValueListExpr() = default;
+
+  RC get_value(const Tuple &tuple, Value &value) override {return RC::SUCCESS;}
+
+  RC try_get_value(Value &value) const override
+  {
+    return RC::SUCCESS;
+  }
+
+  ExprType type() const override { return ExprType::VALUELIST; }
+
+  AttrType value_type() const override { return value_list_[0].attr_type(); }
+
+  vector<Value> &get_valuelist() {return value_list_;}
+
+private:
+  vector<Value> value_list_;
+};
+
+/**
+ * @brief 子查询表达式
+ * @ingroup Expression
+  */
+ class OperExpr : public Expression
+ {
+public:
+  OperExpr() = default;
+  OperExpr(unique_ptr<LogicalOperator> &logic_oper) { 
+    logic_oper_ = std::move(logic_oper); 
+    set_name("Sub-qeury");
+  }
+
+  virtual ~OperExpr() = default;
+
+  RC get_value(const Tuple &tuple, Value &value) override;
+
+  RC try_get_value(Value &value) const override { return RC::SUCCESS; }
+
+  ExprType type() const override { return ExprType::SUB_QUERY; }
+
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+
+  unique_ptr<LogicalOperator> &get_logic_oper() { return logic_oper_; }
+
+  void set_physic_oper(unique_ptr<PhysicalOperator> &physic_oper) { physic_oper_ = std::move(physic_oper); }
+  unique_ptr<PhysicalOperator> &get_physic_oper() { return physic_oper_; }
+
+  RC catch_subquery_results();
+
+  bool has_catched_subquery() { return catched; }
+
+  std::vector<Value> &get_subquery_results() { return subquery_results; }
+
+private:
+  unique_ptr<LogicalOperator>  logic_oper_;
+  unique_ptr<PhysicalOperator> physic_oper_;
+  std::vector<Value>           subquery_results;
+  bool                         catched = false;
+ };
+
 /**
  * @brief 类型转换表达式
  * @ingroup Expression
@@ -167,7 +242,7 @@ public:
   virtual ~CastExpr();
 
   ExprType type() const override { return ExprType::CAST; }
-  RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       get_value(const Tuple &tuple, Value &value) override;
 
   RC try_get_value(Value &value) const override;
 
@@ -195,7 +270,7 @@ public:
 
   ExprType type() const override { return ExprType::COMPARISON; }
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple, Value &value) override;
 
   AttrType value_type() const override { return BOOLEANS; }
 
@@ -215,6 +290,10 @@ public:
    * @param value the result of comparison
    */
   RC compare_value(const Value &left, const Value &right, bool &value) const;
+
+  RC compare_sub_query(const Value &left, const Value &right, bool &value) const;
+
+  RC compare_valuelist(const Value &left, const Value &right, bool &value) const;
 
   RC like_operation(const Value &left, const Value &right, bool &value, bool do_like) const;
 
@@ -247,7 +326,7 @@ public:
 
   AttrType value_type() const override { return BOOLEANS; }
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple, Value &value) override;
 
   Type conjunction_type() const { return conjunction_type_; }
 
@@ -283,7 +362,7 @@ public:
 
   AttrType value_type() const override;
 
-  RC get_value(const Tuple &tuple, Value &value) const override;
+  RC get_value(const Tuple &tuple, Value &value) override;
   RC try_get_value(Value &value) const override;
 
   Type arithmetic_type() const { return arithmetic_type_; }

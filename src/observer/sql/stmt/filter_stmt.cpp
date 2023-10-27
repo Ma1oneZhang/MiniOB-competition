@@ -92,7 +92,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
 
   filter_unit = new FilterUnit;
 
-  if (condition.left_is_attr) {
+  if (condition.left_is_attr == 1) {
     Table           *table = nullptr;
     const FieldMeta *field = nullptr;
     rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
@@ -106,13 +106,24 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     FilterObj filter_obj;
     filter_obj.init_attr(Field(table, field));
     filter_unit->set_left(filter_obj);
-  } else {
+  } else if (condition.left_is_attr == 0) {
     FilterObj filter_obj;
     filter_obj.init_value(condition.left_value);
     filter_unit->set_left(filter_obj);
+  } else if (condition.left_is_attr == 2) {
+    Stmt *stmt = nullptr;
+    rc = Stmt::create_stmt(db, *condition.left_sub_query, stmt); 
+
+    FilterObj filter_obj;
+    filter_obj.init_stmt(stmt);
+    filter_unit->set_left(filter_obj);
+  } else if (condition.left_is_attr == 3) {
+    FilterObj filter_obj;
+    filter_obj.init_valuelist(condition.left_value_list);
+    filter_unit->set_left(filter_obj);
   }
 
-  if (condition.right_is_attr) {
+  if (condition.right_is_attr == 1) {  // the right is attr
     Table           *table = nullptr;
     const FieldMeta *field = nullptr;
     rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
@@ -123,9 +134,20 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     FilterObj filter_obj;
     filter_obj.init_attr(Field(table, field));
     filter_unit->set_right(filter_obj);
-  } else {
+  } else if (condition.right_is_attr == 0) {  // the right is value
     FilterObj filter_obj;
     filter_obj.init_value(condition.right_value);
+    filter_unit->set_right(filter_obj);
+  } else if (condition.right_is_attr == 2) {
+    Stmt *stmt = nullptr;
+    rc = Stmt::create_stmt(db, *condition.right_sub_query, stmt); 
+
+    FilterObj filter_obj;
+    filter_obj.init_stmt(stmt);
+    filter_unit->set_right(filter_obj);
+  } else if (condition.right_is_attr == 3) {
+    FilterObj filter_obj;
+    filter_obj.init_valuelist(condition.right_value_list);
     filter_unit->set_right(filter_obj);
   }
 

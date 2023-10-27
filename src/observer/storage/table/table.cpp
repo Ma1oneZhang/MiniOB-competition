@@ -344,8 +344,8 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   char *record_data = (char *)malloc(record_size);
   int   null_bitmap_offset = table_meta_.null_bitmap_offset();
   int   null_bitmap_size = table_meta_.null_bitmap_size();
-  char  null_bitmap[null_bitmap_size] = {};
-
+  char  null_bitmap[null_bitmap_size];
+  memset(null_bitmap, 0, null_bitmap_size);
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field    = table_meta_.field(i + normal_field_start_index);
     const Value     &value    = values[i];
@@ -364,7 +364,12 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         copy_len = data_len + 1;
       }
     }
-    memcpy(record_data + field->offset(), value.data(), copy_len);
+    if (value.get_isnull()) {
+      // magic number 0x7F
+      memset(record_data + field->offset(), 0x7f, copy_len);
+    } else {
+      memcpy(record_data + field->offset(), value.data(), copy_len);
+    }
   }
 
   memcpy(record_data+null_bitmap_offset, null_bitmap, null_bitmap_size);

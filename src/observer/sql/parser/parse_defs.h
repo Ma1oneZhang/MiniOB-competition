@@ -81,10 +81,14 @@ enum CompOp
   GREAT_THAN,   ///< ">"
   LIKE_OP,      ///< "LIKE operation"
   NOT_LIKE_OP,  ///< "NOT LIKE operation"
-  IS_NULL,
-  IS_NOT_NULL,
+  IS_NULL,      ///< is null 
+  IS_NOT_NULL,  ///< is not null
+  IN_OP,           ///< in (sub_query)
+  NOT_IN_OP,       ///< not in (sub_query)
   NO_OP
 };
+
+class ParsedSqlNode;
 
 /**
  * @brief 表示一个条件比较
@@ -96,15 +100,23 @@ enum CompOp
  */
 struct ConditionSqlNode
 {
+  CompOp         comp;           ///< comparison operator
+
   int left_is_attr;              ///< TRUE if left-hand side is an attribute
                                  ///< 1时，操作符左边是属性名，0时，是属性值
+                                 ///< 0: value, 1: rel_attr, 2: sub_qery, 3: value list
   Value          left_value;     ///< left-hand side value if left_is_attr = FALSE
   RelAttrSqlNode left_attr;      ///< left-hand side attribute
-  CompOp         comp;           ///< comparison operator
-  int            right_is_attr;  ///< TRUE if right-hand side is an attribute
-                                 ///< 1时，操作符右边是属性名，0时，是属性值
+  ParsedSqlNode* left_sub_query;
+  std::vector<Value>  left_value_list;
+
+  int right_is_attr;  ///< TRUE if right-hand side is an attribute
+                                 ///< 1时，操作符左边是属性名，0时，是属性值
+                                 ///< 0: value, 1: rel_attr, 2: sub_qery
   RelAttrSqlNode right_attr;     ///< right-hand side attribute if right_is_attr = TRUE 右边的属性
   Value          right_value;    ///< right-hand side value if right_is_attr = FALSE
+  ParsedSqlNode* right_sub_query;
+  std::vector<Value>  right_value_list;
 };
 
 /**
@@ -282,7 +294,7 @@ struct SetVariableSqlNode
   Value       value;
 };
 
-class ParsedSqlNode;
+
 
 /**
  * @brief 描述一个explain语句

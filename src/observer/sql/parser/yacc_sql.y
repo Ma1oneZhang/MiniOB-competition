@@ -107,6 +107,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         EXPLAIN
         IS
         NULL_TOKEN
+        IN
         EQ
         LT
         GT
@@ -1008,6 +1009,39 @@ condition:
       $$->left_value = *$1;
       $$->comp = CompOp::IS_NOT_NULL;
     }
+    | rel_attr comp_op LBRACE select_stmt RBRACE
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 1;
+      $$->left_attr = *$1;
+      $$->right_is_attr = 2;
+      $$->right_sub_query = $4;
+      $$->comp = $2;
+
+      delete $1;
+    }
+    | rel_attr comp_op tuple
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 1;
+      $$->left_attr = *$1;
+      $$->right_is_attr = 3;
+      $$->right_value_list = *$3;
+      $$->comp = $2;
+
+      delete $1;
+    }
+    | LBRACE select_stmt RBRACE comp_op rel_attr
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 2;
+      $$->left_sub_query = $2;
+      $$->right_is_attr = 1;
+      $$->right_attr = *$5;
+      $$->comp = $4;
+
+      delete $5;
+    }
     ;
 
 comp_op:
@@ -1017,6 +1051,8 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | IN { $$ = IN_OP; }
+    | NOT IN { $$ = NOT_IN_OP; }
     ;
 
 load_data_stmt:

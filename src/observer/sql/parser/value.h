@@ -103,7 +103,7 @@ public:
 
 private:
   AttrType attr_type_ = UNDEFINED;
-  int length_ = 0;
+  int length_ = 4;
   bool isnull_ = false;
 
   union {

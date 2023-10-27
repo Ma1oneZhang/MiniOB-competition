@@ -27,20 +27,34 @@ class FieldMeta;
 
 struct FilterObj 
 {
-  bool is_attr;
+  int is_attr;  // 0: value, 1: attr, 2: sub_query, 3: value list
   Field field;
   Value value;
+  Stmt *sub_query;
+  vector<Value> value_list;
 
   void init_attr(const Field &field)
   {
-    is_attr = true;
+    is_attr = 1;
     this->field = field;
   }
 
   void init_value(const Value &value)
   {
-    is_attr = false;
+    is_attr = 0;
     this->value = value;
+  }
+
+  void init_stmt(Stmt* stmt)
+  {
+    is_attr = 2;
+    this->sub_query = stmt;
+  }
+
+  void init_valuelist(vector<Value> vl)
+  {
+    is_attr = 3;
+    this->value_list = vl;
   }
 };
 

@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 
 class FilterStmt;
+class Tuple;
 
 /**
  * @brief 过滤/谓词物理算子

@@ -23,6 +23,36 @@ RC TableScanPhysicalOperator::open(Trx *trx)
 {
   RC rc = table_->get_record_scanner(record_scanner_, trx, readonly_);
   trx_  = trx;
+
+  // open operators in sub-query
+  for(auto &expr : predicates_) {
+    if (expr->type() == ExprType::COMPARISON) {
+      auto comparison_expr = static_cast<ComparisonExpr *>(expr.get());
+
+      if (comparison_expr->left()->type() == ExprType::SUB_QUERY) {  // this expre contain sub-query
+        // restore physical operator
+        OperExpr                    *oper_expr  = static_cast<OperExpr *>((comparison_expr->left()).get());
+        unique_ptr<PhysicalOperator> &physic_oper = oper_expr->get_physic_oper();
+        
+        // operator.open(trx)
+        rc = physic_oper->open(trx);
+        if(rc != RC::SUCCESS)
+          return rc;
+      }
+
+      if (comparison_expr->right()->type() == ExprType::SUB_QUERY) {  // this expre contain sub-query
+        // restore physical operator
+        OperExpr                    *oper_expr  = static_cast<OperExpr *>((comparison_expr->right()).get());
+        unique_ptr<PhysicalOperator> &physic_oper = oper_expr->get_physic_oper();
+        
+        // operator.open(trx)
+        rc = physic_oper->open(trx);
+        if(rc != RC::SUCCESS)
+          return rc;
+      }
+    }
+  }
+
   return rc;
 }
 

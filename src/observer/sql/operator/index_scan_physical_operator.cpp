@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/index_scan_physical_operator.h"
+#include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
@@ -36,14 +37,36 @@ IndexScanPhysicalOperator::IndexScanPhysicalOperator(Table *table, Index *index,
   left_value_  = new char[left_length_];
   right_value_ = new char[right_length_];
   int offset   = 0;
-  for (auto l : left) {
-    memcpy(left_value_ + offset, l->get_value().data(), l->get_value().length());
-    offset += l->get_value().length();
+  for (int i = 0; i < left.size(); i++) {
+    // if(index->index_meta().field())
+    const auto &l = left[i];
+    if (l->get_value().get_isnull()) {
+      // magic number 0x7F
+      size_t field_length = 0;
+      auto   field_name   = index->index_meta().field()[i].c_str();
+      field_length        = table->table_meta().field(field_name)->len();
+      memset(left_value_ + offset, 0x7F, field_length);
+      offset += field_length;
+    } else {
+      memcpy(left_value_ + offset, l->get_value().data(), l->get_value().length());
+      offset += l->get_value().length();
+    }
   }
   offset = 0;
-  for (auto r : right) {
-    memcpy(right_value_ + offset, r->get_value().data(), r->get_value().length());
-    offset += r->get_value().length();
+  for (int i = 0; i < right.size(); i++) {
+    // if(index->index_meta().field())
+    const auto &r = right[i];
+    if (r->get_value().get_isnull()) {
+      // magic number 0x7F
+      size_t field_length = 0;
+      auto   field_name   = index->index_meta().field()[i].c_str();
+      field_length        = table->table_meta().field(field_name)->len();
+      memset(right_value_ + offset, 0x7F, field_length);
+      offset += field_length;
+    } else {
+      memcpy(right_value_ + offset, r->get_value().data(), r->get_value().length());
+      offset += r->get_value().length();
+    }
   }
 }
 
@@ -135,7 +158,8 @@ RC IndexScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
   RC    rc = RC::SUCCESS;
   Value value;
   for (std::unique_ptr<Expression> &expr : predicates_) {
-    rc = expr->get_value(tuple, value);
+    auto equal = static_cast<ComparisonExpr *>(expr.get());
+    rc         = expr->get_value(tuple, value);
     if (rc != RC::SUCCESS) {
       return rc;
     }

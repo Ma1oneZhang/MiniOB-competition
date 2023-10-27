@@ -186,13 +186,70 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     const FilterObj &filter_obj_left  = filter_unit->left();
     const FilterObj &filter_obj_right = filter_unit->right();
 
-    unique_ptr<Expression> left(filter_obj_left.is_attr
-                                    ? static_cast<Expression *>(new FieldExpr(filter_obj_left.field))
-                                    : static_cast<Expression *>(new ValueExpr(filter_obj_left.value)));
+    // unique_ptr<Expression> left(filter_obj_left.is_attr
+    //                                 ? static_cast<Expression *>(new FieldExpr(filter_obj_left.field))
+    //                                 : static_cast<Expression *>(new ValueExpr(filter_obj_left.value)));
+    // unique_ptr<Expression> right(filter_obj_right.is_attr
+    //                                  ? static_cast<Expression *>(new FieldExpr(filter_obj_right.field))
+    //                                  : static_cast<Expression *>(new ValueExpr(filter_obj_right.value)));
 
-    unique_ptr<Expression> right(filter_obj_right.is_attr
-                                     ? static_cast<Expression *>(new FieldExpr(filter_obj_right.field))
-                                     : static_cast<Expression *>(new ValueExpr(filter_obj_right.value)));
+    // filter_obj_left could be value, attr and sub_query
+    unique_ptr<Expression> left;
+    unique_ptr<LogicalOperator> left_sub_query_oper(nullptr);
+    switch (filter_obj_left.is_attr) {
+      case 0: left.reset(static_cast<Expression *>(new ValueExpr(filter_obj_left.value))); break;
+      case 1: left.reset(static_cast<Expression *>(new FieldExpr(filter_obj_left.field))); break;
+      case 2: 
+      {
+        switch(filter_obj_left.sub_query->type()){
+          case StmtType::CALC:
+            create_plan(dynamic_cast<CalcStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
+          case StmtType::SELECT:
+            create_plan(dynamic_cast<SelectStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
+          // case StmtType::PREDICATE:
+          //   create_plan(dynamic_cast<FilterStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
+          case StmtType::INSERT:
+            create_plan(dynamic_cast<InsertStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
+          case StmtType::DELETE:
+            create_plan(dynamic_cast<DeleteStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
+          case StmtType::UPDATE:
+            create_plan(dynamic_cast<UpdateStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break; 
+        }
+        // OperExpr* sub_query_oper = new OperExpr(sub_query_oper); 
+        left.reset(static_cast<Expression *>(new OperExpr(left_sub_query_oper)));
+      } break;
+      case 3: left.reset(static_cast<Expression *>(new ValueListExpr(filter_obj_left.value_list))); break;
+      default: break;
+    }
+
+    // filter_obj_right could be value, attr and sub_query
+    unique_ptr<Expression> right;
+    unique_ptr<LogicalOperator> right_sub_query_oper(nullptr);
+    switch (filter_obj_right.is_attr) {
+      case 0: right.reset(static_cast<Expression *>(new ValueExpr(filter_obj_right.value))); break;
+      case 1: right.reset(static_cast<Expression *>(new FieldExpr(filter_obj_right.field))); break;
+      case 2: 
+      {
+        switch(filter_obj_right.sub_query->type()){
+          case StmtType::CALC:
+            create_plan(dynamic_cast<CalcStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
+          case StmtType::SELECT:
+            create_plan(dynamic_cast<SelectStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
+          // case StmtType::PREDICATE:
+          //   create_plan(dynamic_cast<FilterStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
+          case StmtType::INSERT:
+            create_plan(dynamic_cast<InsertStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
+          case StmtType::DELETE:
+            create_plan(dynamic_cast<DeleteStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
+          case StmtType::UPDATE:
+            create_plan(dynamic_cast<UpdateStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break; 
+        }
+        // OperExpr* sub_query_oper = new OperExpr(sub_query_oper); 
+        right.reset(static_cast<Expression *>(new OperExpr(right_sub_query_oper)));
+      } break;
+      case 3: right.reset(static_cast<Expression *>(new ValueListExpr(filter_obj_right.value_list))); break;
+      default: break;
+    }
 
     ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
     cmp_exprs.emplace_back(cmp_expr);
