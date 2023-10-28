@@ -540,10 +540,15 @@ bool Value::match_field_type(AttrType field_type)
 
 bool Value::check_match_field_type(AttrType lhs, AttrType rhs)
 {
+  if (lhs == rhs) {
+    return true;
+  }
   switch (lhs) {
     case CHARS: {
       switch (rhs) {
-        case INTS:
+        case INTS: {
+          return true;
+        } break;
         case FLOATS: {
           return true;
         } break;
@@ -555,7 +560,9 @@ bool Value::check_match_field_type(AttrType lhs, AttrType rhs)
     } break;
     case INTS: {
       switch (rhs) {
-        case CHARS:
+        case CHARS: {
+          return true;
+        } break;
         case FLOATS: {
           return true;
         } break;
@@ -567,7 +574,9 @@ bool Value::check_match_field_type(AttrType lhs, AttrType rhs)
     } break;
     case FLOATS: {
       switch (rhs) {
-        case CHARS:
+        case CHARS: {
+          return true;
+        } break;
         case INTS: {
           return true;
         } break;
@@ -575,7 +584,6 @@ bool Value::check_match_field_type(AttrType lhs, AttrType rhs)
           return false;
         } break;
       }
-      return false;
     } break;
     default: {
       return false;
