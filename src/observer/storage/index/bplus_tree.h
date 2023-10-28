@@ -140,17 +140,19 @@ public:
   // int compare_with_length_limit()
   int operator()(const char *v1, const char *v2) const
   {
-    bool   is_null = true;
-    size_t offset  = 0;
+    bool   has_null = false;
+    size_t offset   = 0;
     for (auto cmp : attr_comparators_) {
+      bool all_null = true;
       for (int i = 0; i < cmp.attr_length(); i++) {
         if (*(v1 + offset + i) == 0x7f || *(v2 + offset + i) == 0x7f) {
           continue;
         } else {
-          is_null = false;
+          all_null = false;
           break;
         }
       }
+      has_null |= all_null;
       int result = cmp(v1 + offset, v2 + offset);
       if (result != 0) {
         return result;
@@ -158,7 +160,7 @@ public:
       offset += cmp.attr_length();
     }
 
-    if (is_unique_ && !is_null)
+    if (is_unique_ && !has_null)
       return 0;
     const RID *rid1 = (const RID *)(v1 + offset);
     const RID *rid2 = (const RID *)(v2 + offset);

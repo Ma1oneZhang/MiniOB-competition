@@ -73,7 +73,8 @@ RC UpdatePhysicalOperator::next()
         // do nothing
         continue;
       } else {
-        memcpy((record.data() + attr_offset), value.data(), attr_len);
+        memset(record.data() + attr_offset, 0, attr_len);
+        memcpy((record.data() + attr_offset), value.data(), min(attr_len, value.length()));
       }
     }
     rc = trx_->update_record(table_, old_record, record);
