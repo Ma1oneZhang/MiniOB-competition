@@ -75,6 +75,8 @@ public:
 
   AttrType attr_type() const { return attr_type_; }
 
+  static bool check_match_field_type(AttrType lhs, AttrType rhs);
+
 public:
   /**
    * 获取对应的值

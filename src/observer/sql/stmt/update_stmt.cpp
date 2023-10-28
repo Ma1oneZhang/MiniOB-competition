@@ -65,7 +65,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
           }
           // check the query field is matchi
           const auto &field = query_fields.front();
-          if (field.attr_type() != iter->type()) {
+          if (field.attr_type() != iter->type() && !Value::check_match_field_type(field.attr_type(), iter->type())) {
             return RC::SCHEMA_FIELD_TYPE_MISMATCH;
           }
           values.push_back(select_stmt);
@@ -74,7 +74,8 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
           auto i = value.value;
           values.emplace_back(i);
           break;
-        } else if (iter->type() == value.value.attr_type()) {
+        } else if (iter->type() == value.value.attr_type() ||
+                   Value::check_match_field_type(value.value.attr_type(), iter->type())) {
           // we only need match one of field
           auto i = value.value;
           values.emplace_back(i);

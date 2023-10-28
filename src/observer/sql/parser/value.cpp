@@ -157,6 +157,9 @@ void Value::set_value(const Value &value)
     case UNDEFINED: {
       ASSERT(false, "got an invalid value type");
     } break;
+    case STMT: {
+      // for reduce warning
+    } break;
   }
 }
 
@@ -533,4 +536,49 @@ bool Value::match_field_type(AttrType field_type)
 
   // the conversion successed
   return true;
+}
+
+bool Value::check_match_field_type(AttrType lhs, AttrType rhs)
+{
+  switch (lhs) {
+    case CHARS: {
+      switch (rhs) {
+        case INTS:
+        case FLOATS: {
+          return true;
+        } break;
+        default: {
+          return false;
+        } break;
+      }
+      return false;
+    } break;
+    case INTS: {
+      switch (rhs) {
+        case CHARS:
+        case FLOATS: {
+          return true;
+        } break;
+        default: {
+          return false;
+        } break;
+      }
+      return false;
+    } break;
+    case FLOATS: {
+      switch (rhs) {
+        case CHARS:
+        case INTS: {
+          return true;
+        } break;
+        default: {
+          return false;
+        } break;
+      }
+      return false;
+    } break;
+    default: {
+      return false;
+    } break;
+  }
 }

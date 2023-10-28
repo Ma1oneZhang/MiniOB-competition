@@ -53,6 +53,7 @@ RC UpdatePhysicalOperator::next()
       if (rc != RC::SUCCESS) {
         return rc;
       }
+      value.match_field_type(field->type());
       // update null bitmap
       if (field->nullable()) {
         int  field_index        = table_->table_meta().field_index(attribute_names_.at(i).c_str());
