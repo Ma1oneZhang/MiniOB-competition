@@ -416,8 +416,14 @@ RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &update_oper, std::u
       return rc;
     }
   }
+  for (auto &lazy_value : update_oper.values()) {
+    if (lazy_value.get_select_stmt() != nullptr) {
+      auto ptr = lazy_value.get_logical_operator().get();
+      create(*ptr, lazy_value.get_physical_operator());
+    }
+  }
   oper = unique_ptr<PhysicalOperator>(new UpdatePhysicalOperator(
-      update_oper.table(), update_oper.attr_names(), update_oper.values(), update_oper.value_amount()));
+      update_oper.table(), std::move(update_oper.attr_names()), std::move(update_oper.values())));
 
   if (child_physical_oper) {
     oper->add_child(std::move(child_physical_oper));

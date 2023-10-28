@@ -12,10 +12,9 @@ See the Mulan PSL v2 for more details. */
 // Created by WangYunlai on 2023/06/28.
 //
 
-#include <sstream>
 #include <cmath>
 #include "sql/parser/value.h"
-#include "storage/field/field.h"
+#include "sql/operator/physical_operator.h"
 #include "common/log/log.h"
 #include "common/lang/comparator.h"
 #include "common/lang/string.h"
@@ -161,15 +160,9 @@ void Value::set_value(const Value &value)
   }
 }
 
-void Value::set_isnull()
-{
-  isnull_ = true;
-}
+void Value::set_isnull() { isnull_ = true; }
 
-void Value::set_isnotnull()
-{
-  isnull_ = false;
-}
+void Value::set_isnotnull() { isnull_ = false; }
 
 const char *Value::data() const
 {
@@ -188,10 +181,10 @@ std::string Value::to_string() const
   std::string res;
 
   // return null is the value is null
-  if(get_isnull()){
+  if (get_isnull()) {
     return "NULL";
   }
-  
+
   switch (attr_type_) {
     case INTS: {
       res = std::to_string(num_value_.int_value_);
@@ -223,7 +216,7 @@ std::string Value::to_string() const
 int Value::compare(const Value &other) const
 {
   // return false when any value is NULL
-  if(isnull_ & other.get_isnull())
+  if (isnull_ & other.get_isnull())
     return 0;
   else if (isnull_)
     return -1;
@@ -419,10 +412,7 @@ bool Value::get_boolean() const
   return false;
 }
 
-bool Value::get_isnull() const
-{
-  return isnull_; 
-}
+bool Value::get_isnull() const { return isnull_; }
 
 int returnPrefixNum(const char *str, int &val)
 {

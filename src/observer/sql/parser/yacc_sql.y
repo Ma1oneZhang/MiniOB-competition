@@ -567,9 +567,10 @@ update_stmt:      /*  update 语句的语法解析树*/
       for(auto &value : *$5){
         $$->update.attribute_name.push_back(value.attribute_name);
       }
-      for(auto &value : *$5){
-        $$->update.value.push_back(value.value);
-      }
+      $$->update.value.swap(*$5);
+      // for(auto &value : *$5){
+      //   push_back(value.value);
+      // }
       if ($6 != nullptr) {
         $$->update.conditions.swap(*$6);
         delete $6;
@@ -586,6 +587,14 @@ update_attr:
       $$ = new UpdateValue;
       $$->attribute_name = $1;
       $$->value = *$3;
+      $$->is_stmt = false;
+    }
+    | ID EQ LBRACE select_stmt RBRACE
+    {
+      $$ = new UpdateValue;
+      $$->attribute_name = $1;
+      $$->is_stmt = true;
+      $$->stmt = $4;
     }
     ;
 
