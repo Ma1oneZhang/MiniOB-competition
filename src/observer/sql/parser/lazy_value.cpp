@@ -38,4 +38,5 @@ void LazyValue::lazy_execution()
     execution_result_ = RC::MULTI_ROW_RETURN;
     return;
   }
+  physical_operator_->close();
 }
