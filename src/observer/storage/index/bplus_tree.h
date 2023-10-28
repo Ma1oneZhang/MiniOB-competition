@@ -126,29 +126,44 @@ public:
 
   int attr_comparator(const char *v1, const char *v2) const
   {
-    size_t offset = 0;
+    size_t offset  = 0;
+    bool   is_null = false;
     for (auto cmp : attr_comparators_) {
-      int result = cmp(v1 + offset, v2 + offset);
-      if (result != 0) {
-        return result;
+      if (*(v1 + offset) == 0x7f || *(v2 + offset) == 0x7f) {
+        is_null = true;
+      } else {
+        int result = cmp(v1 + offset, v2 + offset);
+        if (result != 0) {
+          return result;
+        }
       }
       offset += cmp.attr_length();
+    }
+    if (is_null) {
+      const RID *rid1 = (const RID *)(v1 + offset);
+      const RID *rid2 = (const RID *)(v2 + offset);
+      return RID::compare(rid1, rid2);
     }
     return 0;
   }
   // int compare_with_length_limit()
   int operator()(const char *v1, const char *v2) const
   {
-    size_t offset = 0;
+    bool   is_null = false;
+    size_t offset  = 0;
     for (auto cmp : attr_comparators_) {
-      int result = cmp(v1 + offset, v2 + offset);
-      if (result != 0) {
-        return result;
+      if (*(v1 + offset) == 0x7f || *(v2 + offset) == 0x7f) {
+        is_null = true;
+      } else {
+        int result = cmp(v1 + offset, v2 + offset);
+        if (result != 0) {
+          return result;
+        }
       }
       offset += cmp.attr_length();
     }
 
-    if (is_unique_)
+    if (is_unique_ && !is_null)
       return 0;
     const RID *rid1 = (const RID *)(v1 + offset);
     const RID *rid2 = (const RID *)(v2 + offset);
