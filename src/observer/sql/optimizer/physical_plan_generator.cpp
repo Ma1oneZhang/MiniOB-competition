@@ -139,42 +139,34 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
         oper_expr->set_physic_oper(physic_oper);
       }
 
-      switch (comparison_expr->comp()) {
-        // 等值查询
-        case EQUAL_TO: {
-          if (comparison_expr->comp() != EQUAL_TO) {
-            continue;
-          }
+      if (comparison_expr->comp()) {
+        unique_ptr<Expression> &left_expr  = comparison_expr->left();
+        unique_ptr<Expression> &right_expr = comparison_expr->right();
+        // 左右比较的一边最少是一个值
+        if (left_expr->type() != ExprType::VALUE && right_expr->type() != ExprType::VALUE) {
+          continue;
+        }
 
-          unique_ptr<Expression> &left_expr  = comparison_expr->left();
-          unique_ptr<Expression> &right_expr = comparison_expr->right();
-          // 左右比较的一边最少是一个值
-          if (left_expr->type() != ExprType::VALUE && right_expr->type() != ExprType::VALUE) {
-            continue;
-          }
+        FieldExpr *field_expr = nullptr;
+        if (left_expr->type() == ExprType::FIELD) {
+          ASSERT(right_expr->type() == ExprType::VALUE, "right expr should be a value expr while left is field expr");
+          field_expr = static_cast<FieldExpr *>(left_expr.get());
+          value_exprs.push_back(static_cast<ValueExpr *>(right_expr.get()));
+        } else if (right_expr->type() == ExprType::FIELD) {
+          ASSERT(left_expr->type() == ExprType::VALUE, "left expr should be a value expr while right is a field expr");
+          field_expr = static_cast<FieldExpr *>(right_expr.get());
+          value_exprs.push_back(static_cast<ValueExpr *>(left_expr.get()));
+        }
 
-          FieldExpr *field_expr = nullptr;
-          if (left_expr->type() == ExprType::FIELD) {
-            ASSERT(right_expr->type() == ExprType::VALUE, "right expr should be a value expr while left is field expr");
-            field_expr = static_cast<FieldExpr *>(left_expr.get());
-            value_exprs.push_back(static_cast<ValueExpr *>(right_expr.get()));
-          } else if (right_expr->type() == ExprType::FIELD) {
-            ASSERT(
-                left_expr->type() == ExprType::VALUE, "left expr should be a value expr while right is a field expr");
-            field_expr = static_cast<FieldExpr *>(right_expr.get());
-            value_exprs.push_back(static_cast<ValueExpr *>(left_expr.get()));
-          }
+        if (field_expr == nullptr) {
+          continue;
+        }
 
-          if (field_expr == nullptr) {
-            continue;
-          }
-
-          const Field &field = field_expr->field();
-          field_names.push_back(field.field_name());
-          if (nullptr != index) {
-            break;
-          }
-        } break;
+        const Field &field = field_expr->field();
+        field_names.push_back(field.field_name());
+        if (nullptr != index) {
+          break;
+        }
       }
     }
   }
@@ -444,8 +436,11 @@ RC PhysicalPlanGenerator::create_plan(AggregationLogicalOperator &aggr_oper, std
       LOG_WARN("failed to create physical operator. rc=%s", strrc(rc));
       return rc;
     }
+  } else {
+    LOG_WARN("aggr operator must have child operator");
+    return RC::EMPTY;
   }
-  oper = unique_ptr<PhysicalOperator>(new AggregationPhysicalOperator(aggr_oper.field()));
+  oper = unique_ptr<PhysicalOperator>(new AggregationPhysicalOperator(aggr_oper.field(), aggr_oper.group_by_fields()));
   if (child_physical_oper) {
     oper->add_child(std::move(child_physical_oper));
   }

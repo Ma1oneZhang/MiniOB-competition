@@ -46,10 +46,13 @@ public:
   const std::vector<Field>   &query_fields() const { return query_fields_; }
   FilterStmt                 *filter_stmt() const { return filter_stmt_; }
   OrderByStmt                *order_by_stmt() const { return order_by_stmt_; }
+  FilterStmt                 *having_stmt() const { return having_stmt_; }
 
 private:
+  std::vector<Field>   group_by;
   std::vector<Field>   query_fields_;
   std::vector<Table *> tables_;
-  FilterStmt          *filter_stmt_  = nullptr;
+  FilterStmt          *having_stmt_    = nullptr;
+  FilterStmt          *filter_stmt_   = nullptr;
   OrderByStmt         *order_by_stmt_ = nullptr;
 };

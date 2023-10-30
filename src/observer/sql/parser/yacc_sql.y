@@ -80,7 +80,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         RBRACE
         COMMA
         ORDER
+        GROUP
         BY
+        HAVING
         ASC
         TRX_BEGIN
         TRX_COMMIT
@@ -169,8 +171,11 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <condition_list>      condition_list
 %type <rel_attr_list>       select_attr
 %type <relation_list>       rel_list
-%type <rel_attr_list>       aggr_list
 %type <rel_attr_list>       attr_list
+%type <rel_attr_list>       group_by
+%type <condition_list>      having
+%type <condition_list>      having_list
+%type <condition>           having_attr
 %type <relation_list>       index_field_list
 %type <order_by_attr>       order_by_node
 %type <order_by_attr_list>  order_by_node_list
@@ -613,7 +618,7 @@ update_attr_list:
       $$->push_back(*$2);
     };
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list join_list where order_by
+    SELECT select_attr FROM ID rel_list join_list where order_by group_by having
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -637,6 +642,12 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($8 != nullptr) {
         $$->selection.orderby.swap(*$8);
         delete $8;
+      }
+      if ($9 != nullptr){
+        $$->selection.groupby.swap(*$9);
+      }
+      if ($10 != nullptr){
+        $$->selection.having.swap(*$10);
       }
       free($4);
     }
@@ -704,7 +715,7 @@ select_attr:
       $$->emplace_back(*$1);
       delete $1;
     }
-    | aggr_attr aggr_list {
+    | aggr_attr attr_list {
       if ($2 != nullptr) {
         $$ = $2;
       } else {
@@ -747,6 +758,15 @@ attr_list:
         $$ = new std::vector<RelAttrSqlNode>;
       }
 
+      $$->emplace_back(*$2);
+      delete $2;
+    }
+    | COMMA aggr_attr attr_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<RelAttrSqlNode>;
+      }
       $$->emplace_back(*$2);
       delete $2;
     }
@@ -796,22 +816,68 @@ aggr_attr:
       $$->aggregation_type = AggregationType::SUM;
     }
 
-aggr_list:
+group_by:
     /* empty */
     {
       $$ = nullptr;
     }
-    | COMMA aggr_attr aggr_list {
-      if ($3 != nullptr) {
-        $$ = $3;
+    | GROUP BY rel_attr attr_list
+    {
+      if($4 != nullptr){
+        $$ = $4;
       } else {
         $$ = new std::vector<RelAttrSqlNode>;
+      }
+      $$->emplace_back(*$3);
+      delete $3;
+    };
+    
+having:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | HAVING having_attr having_list
+    {
+      if($3 != nullptr){
+        $$ = $3;
+      } else {
+        $$ = new std::vector<ConditionSqlNode>;
+      }
+      $$->emplace_back(*$2);
+      delete $2;
+    }
+    ;
+having_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA having_attr having_list
+    {
+      if($3 != nullptr){
+        $$ = $3;
+      } else {
+        $$ = new std::vector<ConditionSqlNode>;
       }
       $$->emplace_back(*$2);
       delete $2;
     }
     ;
 
+having_attr:
+    aggr_attr comp_op value
+    {
+      $$ = new ConditionSqlNode;
+      $$->left_is_attr = 1;
+      $$->left_attr = *$1;
+      $$->right_is_attr = 0;
+      $$->right_value = *$3;
+      $$->comp = $2;
+
+      delete $1;
+      delete $3;
+    }
 join_node:
     INNER JOIN ID ON condition_list
     {

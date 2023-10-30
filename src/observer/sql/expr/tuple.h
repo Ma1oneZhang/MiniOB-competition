@@ -391,7 +391,7 @@ public:
   virtual RC find_cell(const TupleCellSpec &spec, Value &cell) const override
   {
     for (size_t i = 0; i < names_.size(); i++) {
-      if (names_[i] == std::string(spec.alias())) {
+      if (names_[i] == std::string(spec.field_name())) {
         cell = cells_[i];
         return RC::SUCCESS;
       }

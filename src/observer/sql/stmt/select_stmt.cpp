@@ -22,6 +22,30 @@ See the Mulan PSL v2 for more details. */
 #include "storage/field/field.h"
 #include "storage/table/table.h"
 
+void build_aggr_field_name(AggregationType type, std::string &field_name)
+{
+  switch (type) {
+    case AggregationType::MAX: {
+      field_name = "MAX(" + field_name + ")";
+    } break;
+    case AggregationType::MIN: {
+      field_name = "MIN(" + field_name + ")";
+    } break;
+    case AggregationType::COUNT: {
+      field_name = "COUNT(" + field_name + ")";
+    } break;
+    case AggregationType::AVG: {
+      field_name = "AVG(" + field_name + ")";
+    } break;
+    case AggregationType::SUM: {
+      field_name = "SUM(" + field_name + ")";
+    } break;
+    case AggregationType::NONE: {
+      LOG_PANIC("WARN_AGGREGATION_TYPE");
+    } break;
+  }
+}
+
 SelectStmt::~SelectStmt()
 {
   if (nullptr != filter_stmt_) {
@@ -51,6 +75,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   std::unordered_map<std::string, Table *> table_map;
   std::vector<ConditionSqlNode>            conditions = select_sql.conditions;
 
+  // check sql relations
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     auto &table_name = select_sql.relations[i];
     if ("" == table_name) {
@@ -79,6 +104,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       if (select_sql.orderby.size() != 0) {
         return RC::INVALID_ARGUMENT;
       }
+      // check if the relation_attr is valid
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
           0 == strcmp(relation_attr.attribute_name.c_str(), "*")) {
         // only count operation support "*" relation
@@ -172,6 +198,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
         }
         table_map[table_name] = table;
       }
+      // check if the relation_attr is valid
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
           0 == strcmp(relation_attr.attribute_name.c_str(), "*")) {
         for (Table *table : tables) {
@@ -233,11 +260,14 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   if (tables.size() == 1) {
     default_table = *tables.begin();
   }
+
+  // create join conditions in `join` statement
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
     std::vector<ConditionSqlNode> const &tmp_vec_condi = select_sql.joinctions[i].join_conditions;
     for (auto &j : tmp_vec_condi)
       conditions.emplace_back(j);
   }
+
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
   RC          rc          = FilterStmt::create(
@@ -246,7 +276,6 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
-
   // create order by stmt in 'ordey_by' statement
   OrderByStmt *order_by_stmt = nullptr;
   rc                         = OrderByStmt::create(db, default_table, &table_map, &select_sql.orderby, order_by_stmt);
@@ -254,13 +283,108 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     LOG_WARN("cannot construct order by stmt");
     return rc;
   }
+
+  // check if have no group by, then only allowed aggregation function
+  if (select_sql.groupby.size() == 0) {
+    for (size_t i = 0; i < select_sql.attributes.size(); i++) {
+      if (select_sql.attributes[i].aggregation_type != AggregationType::NONE) {
+        LOG_WARN("invalid group by condition");
+        return RC::INVALID_ARGUMENT;
+      }
+    }
+  }
+
+  // check the group by condition is valid
+  std::vector<Field> groupby;
+  if (select_sql.groupby.size() != 0) {
+    for (size_t i = 0; i < select_sql.groupby.size(); i++) {
+      if (select_sql.groupby[i].aggregation_type != AggregationType::NONE) {
+        LOG_WARN("invalid group by condition");
+        return RC::INVALID_ARGUMENT;
+      }
+      // check the group by is exist in the query fields
+      bool is_exist = false;
+      for (size_t j = 0; j < query_fields.size(); j++) {
+        // check the attr name is exist in the query fields
+        if ((select_sql.groupby[i].relation_name == query_fields[j].table()->name() ||
+                select_sql.groupby[i].relation_name == "") &&
+            select_sql.groupby[i].attribute_name == query_fields[j].field_name()) {
+          is_exist = true;
+          break;
+        }
+      }
+      if (!is_exist) {
+        LOG_WARN("invalid group by condition");
+        return RC::INVALID_ARGUMENT;
+      }
+    }
+  }
+  // add to group by vector
+  for (size_t i = 0; i < select_sql.groupby.size(); i++) {
+    for (size_t j = 0; j < query_fields.size(); j++) {
+      // add table name to the group field
+      if (select_sql.groupby[i].attribute_name == query_fields[j].field_name()) {
+        groupby.push_back(query_fields[j]);
+        break;
+      }
+    }
+  }
+
+  // check the having condition is existed with group by
+  if (select_sql.groupby.size() == 0 && select_sql.having.size() != 0) {
+    LOG_WARN("invalid having condition");
+    return RC::INVALID_ARGUMENT;
+  }
+
+  // check the having condition is valid
+  if (select_sql.having.size() != 0) {
+    for (size_t i = 0; i < select_sql.having.size(); i++) {
+      if (select_sql.having[i].left_attr.aggregation_type == AggregationType::NONE) {
+        LOG_WARN("invalid having condition");
+        return RC::INVALID_ARGUMENT;
+      }
+      // check the having is exist in the query fields
+      bool is_exist = false;
+      for (size_t j = 0; j < query_fields.size(); j++) {
+        // check the attr name is exist in the query fields
+        auto attr_name = select_sql.having[i].left_attr.attribute_name;
+        build_aggr_field_name(select_sql.having[i].left_attr.aggregation_type, attr_name);
+        if ((select_sql.having[i].left_attr.relation_name == query_fields[j].table()->name() ||
+                select_sql.having[i].left_attr.relation_name == "") &&
+            attr_name == query_fields[j].field_name()) {
+          is_exist = true;
+          break;
+        }
+      }
+      if (!is_exist) {
+        LOG_WARN("invalid having condition");
+        return RC::INVALID_ARGUMENT;
+      }
+    }
+  }
+  // create filter stmt for having
+  FilterStmt *having_stmt = nullptr;
+  if (!select_sql.having.empty()) {
+    rc = FilterStmt::create(db,
+        default_table,
+        &table_map,
+        select_sql.having.data(),
+        static_cast<int>(select_sql.having.size()),
+        having_stmt);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("cannot construct having stmt");
+      return rc;
+    }
+ }
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
 
   select_stmt->tables_ = std::vector<Table *>(tables.begin(), tables.end());
   select_stmt->query_fields_.swap(query_fields);
+  select_stmt->having_stmt_   = having_stmt;
   select_stmt->filter_stmt_   = filter_stmt;
   select_stmt->order_by_stmt_ = order_by_stmt;
+  select_stmt->group_by       = groupby;
   stmt                        = select_stmt;
 
   return RC::SUCCESS;

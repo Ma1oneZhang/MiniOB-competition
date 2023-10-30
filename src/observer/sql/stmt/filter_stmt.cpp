@@ -104,7 +104,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
       return RC::INVALID_ARGUMENT;
     }
     FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
+    filter_obj.init_attr(Field(table, field, condition.left_attr.aggregation_type));
     filter_unit->set_left(filter_obj);
   } else if (condition.left_is_attr == 0) {
     FilterObj filter_obj;
