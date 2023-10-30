@@ -286,10 +286,18 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
 
   // check if have no group by, then only allowed aggregation function
   if (select_sql.groupby.size() == 0) {
+    bool has_aggr = false;
     for (size_t i = 0; i < select_sql.attributes.size(); i++) {
       if (select_sql.attributes[i].aggregation_type != AggregationType::NONE) {
-        LOG_WARN("invalid group by condition");
-        return RC::INVALID_ARGUMENT;
+        has_aggr = true;
+      }
+    }
+    if (has_aggr) {
+      for (size_t i = 0; i < select_sql.attributes.size(); i++) {
+        if (select_sql.attributes[i].aggregation_type == AggregationType::NONE) {
+          LOG_WARN("invalid group by condition");
+          return RC::INVALID_ARGUMENT;
+        }
       }
     }
   }
@@ -375,7 +383,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       LOG_WARN("cannot construct having stmt");
       return rc;
     }
- }
+  }
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
 

@@ -51,10 +51,12 @@ RC AggregationPhysicalOperator::next()
       }
       // for each field
       for (auto field : aggr_fields_) {
-        if (std::string(field.field_name()) == std::string("COUNT(*)") && is_all_null) {
+        if (std::string(field.field_name()) == std::string("COUNT(*)")) {
+          auto v  = Value{};
+          auto rc = map_(group_by_values, v, AggregationType::COUNT);
+        } else if (is_all_null) {
           continue;
-        }
-        if (field.get_aggr_type() != AggregationType::NONE) {
+        } else if (field.get_aggr_type() != AggregationType::NONE) {
           Value value;
           auto  rc = tuple->find_cell({field.table_name(), field.meta()->name()}, value);
           if (rc != RC::SUCCESS) {
