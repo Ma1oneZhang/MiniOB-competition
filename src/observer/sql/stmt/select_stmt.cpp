@@ -252,7 +252,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
         query_fields.push_back(Field(table, field_meta));
       }
     }
-  }  
+  }
   LOG_INFO("got %d tables in from stmt and %d fields in query stmt", tables.size(), query_fields.size());
 
   Table *default_table = nullptr;
@@ -350,23 +350,23 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
         LOG_WARN("invalid having condition");
         return RC::INVALID_ARGUMENT;
       }
-      // check the having is exist in the query fields
-      bool is_exist = false;
-      for (size_t j = 0; j < query_fields.size(); j++) {
-        // check the attr name is exist in the query fields
-        auto attr_name = select_sql.having[i].left_attr.attribute_name;
-        build_aggr_field_name(select_sql.having[i].left_attr.aggregation_type, attr_name);
-        if ((select_sql.having[i].left_attr.relation_name == query_fields[j].table()->name() ||
-                select_sql.having[i].left_attr.relation_name == "") &&
-            attr_name == query_fields[j].field_name()) {
-          is_exist = true;
-          break;
-        }
-      }
-      if (!is_exist) {
-        LOG_WARN("invalid having condition");
-        return RC::INVALID_ARGUMENT;
-      }
+      // // check the having is exist in the query fields
+      // bool is_exist = false;
+      // for (size_t j = 0; j < query_fields.size(); j++) {
+      //   // check the attr name is exist in the query fields
+      //   auto attr_name = select_sql.having[i].left_attr.attribute_name;
+      //   build_aggr_field_name(select_sql.having[i].left_attr.aggregation_type, attr_name);
+      //   if ((select_sql.having[i].left_attr.relation_name == query_fields[j].table()->name() ||
+      //           select_sql.having[i].left_attr.relation_name == "") &&
+      //       attr_name == query_fields[j].field_name()) {
+      //     is_exist = true;
+      //     break;
+      //   }
+      // }
+      // if (!is_exist) {
+      //   LOG_WARN("invalid having condition");
+      //   return RC::INVALID_ARGUMENT;
+      // }
     }
   }
   // create filter stmt for having
@@ -383,15 +383,25 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       return rc;
     }
   }
-  // everything alright
-  SelectStmt *select_stmt = new SelectStmt();
 
+  // everything alright
+  SelectStmt        *select_stmt = new SelectStmt();
+  std::vector<Field> having;
+  for (auto having_field : having_stmt->filter_units()) {
+    if (having_field->left().is_attr == 1) {
+      having.push_back(having_field->left().field);
+    }
+    if (having_field->right().is_attr == 1) {
+      having.push_back(having_field->right().field);
+    }
+  }
   select_stmt->tables_ = std::vector<Table *>(tables.begin(), tables.end());
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->having_stmt_   = having_stmt;
   select_stmt->filter_stmt_   = filter_stmt;
   select_stmt->order_by_stmt_ = order_by_stmt;
-  select_stmt->group_by       = groupby;
+  select_stmt->group_by_       = groupby;
+  select_stmt->having_         = std::move(having);
   stmt                        = select_stmt;
 
   return RC::SUCCESS;

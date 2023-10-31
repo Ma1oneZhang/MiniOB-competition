@@ -47,12 +47,14 @@ public:
   FilterStmt                 *filter_stmt() const { return filter_stmt_; }
   OrderByStmt                *order_by_stmt() const { return order_by_stmt_; }
   FilterStmt                 *having_stmt() const { return having_stmt_; }
+  const std::vector<Field>   &having() const { return having_; }
 
 private:
-  std::vector<Field>   group_by;
+  std::vector<Field>   group_by_;
+  std::vector<Field>   having_;
   std::vector<Field>   query_fields_;
   std::vector<Table *> tables_;
-  FilterStmt          *having_stmt_    = nullptr;
+  FilterStmt          *having_stmt_   = nullptr;
   FilterStmt          *filter_stmt_   = nullptr;
   OrderByStmt         *order_by_stmt_ = nullptr;
 };

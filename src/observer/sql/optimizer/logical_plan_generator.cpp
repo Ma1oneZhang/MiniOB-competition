@@ -129,7 +129,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
 
   if (aggr) {
-    unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(fields, group_by));
+    auto fields_ = fields;
+    fields_.insert(fields_.begin(), select_stmt->having().begin(), select_stmt->having().end());
+    unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(fields_, group_by));
     aggregation_oper.swap(aggr_oper);
   }
 
