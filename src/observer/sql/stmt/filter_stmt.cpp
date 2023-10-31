@@ -104,6 +104,13 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
       return RC::INVALID_ARGUMENT;
     }
     FilterObj filter_obj;
+    if (field->type() == AttrType::DATES) {
+      auto value  = condition.right_value;
+      auto status = value.match_field_type(AttrType::DATES);
+      if (!status) {
+        return RC::INVALID_ARGUMENT;
+      }
+    }
     filter_obj.init_attr(Field(table, field, condition.left_attr.aggregation_type));
     filter_unit->set_left(filter_obj);
   } else if (condition.left_is_attr == 0) {
@@ -112,7 +119,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     filter_unit->set_left(filter_obj);
   } else if (condition.left_is_attr == 2) {
     Stmt *stmt = nullptr;
-    rc = Stmt::create_stmt(db, *condition.left_sub_query, stmt); 
+    rc         = Stmt::create_stmt(db, *condition.left_sub_query, stmt);
 
     FilterObj filter_obj;
     filter_obj.init_stmt(stmt);
@@ -140,7 +147,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     filter_unit->set_right(filter_obj);
   } else if (condition.right_is_attr == 2) {
     Stmt *stmt = nullptr;
-    rc = Stmt::create_stmt(db, *condition.right_sub_query, stmt); 
+    rc         = Stmt::create_stmt(db, *condition.right_sub_query, stmt);
 
     FilterObj filter_obj;
     filter_obj.init_stmt(stmt);
