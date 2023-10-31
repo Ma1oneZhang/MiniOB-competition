@@ -428,7 +428,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
-      $$->nullable = false;
+      $$->nullable = true;
       free($1);
     }
     | ID type NULL_TOKEN
@@ -455,7 +455,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
-      $$->nullable = false;
+      $$->nullable = true;
       free($1);
     }
     ;
