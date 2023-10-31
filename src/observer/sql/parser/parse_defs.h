@@ -45,12 +45,13 @@ struct OrderBySqlNode
  */
 enum class AggregationType
 {
+  NONE,
   MAX,
   MIN,
   COUNT,
   AVG,
   SUM,
-  NONE
+
 };
 
 /**

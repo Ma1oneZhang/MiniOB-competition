@@ -97,50 +97,40 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   const std::vector<Table *> &tables     = select_stmt->tables();
   const std::vector<Field>   &all_fields = select_stmt->query_fields();
 
+  std::vector<Field> fields;
+  std::vector<Field> group_by;
+  bool               aggr = false;
   for (Table *table : tables) {
-    std::vector<Field> fields;
-    std::vector<Field> group_by;
     for (const Field &field : all_fields) {
-      if (field.get_aggr_type() == AggregationType::COUNT) {
+      if (field.get_aggr_type() != AggregationType::NONE) {
+        aggr = true;
+      }
+      // count(*)
+      if (field.get_aggr_type() == AggregationType::COUNT && field.table() == nullptr) {
         fields.push_back(field);
       } else if (0 == strcmp(field.table_name(), table->name())) {
         fields.push_back(field);
       }
     }
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, true /*readonly*/));
-    bool                        aggr = false;
-    for (auto &field : all_fields) {
-      if (field.get_aggr_type() != AggregationType::NONE) {
-        aggr = true;
-        break;
+    for (const Field &field : all_fields) {
+      if (0 == strcmp(field.table_name(), table->name()) && field.get_aggr_type() == AggregationType::NONE) {
+        group_by.push_back(field);
       }
     }
-    // get group by field
-    if (aggr) {
-      for (const Field &field : all_fields) {
-        if (0 == strcmp(field.table_name(), table->name()) && field.get_aggr_type() == AggregationType::NONE) {
-          group_by.push_back(field);
-        }
-      }
-    }
-    if (!aggr) {
-      // plain
-      if (table_oper == nullptr) {
-        table_oper = std::move(table_get_oper);
-      } else {
-        JoinLogicalOperator *join_oper = new JoinLogicalOperator;
-        join_oper->add_child(std::move(table_oper));
-        join_oper->add_child(std::move(table_get_oper));
-        table_oper = unique_ptr<LogicalOperator>(join_oper);
-      }
+    if (table_oper == nullptr) {
+      table_oper = std::move(table_get_oper);
     } else {
-      // aggr func
-      if (table_oper == nullptr) {
-        table_oper = std::move(table_get_oper);
-      }
-      unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(table, fields, group_by));
-      aggregation_oper.swap(aggr_oper);
+      JoinLogicalOperator *join_oper = new JoinLogicalOperator;
+      join_oper->add_child(std::move(table_oper));
+      join_oper->add_child(std::move(table_get_oper));
+      table_oper = unique_ptr<LogicalOperator>(join_oper);
     }
+  }
+
+  if (aggr) {
+    unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(fields, group_by));
+    aggregation_oper.swap(aggr_oper);
   }
 
   unique_ptr<LogicalOperator> predicate_oper;

@@ -2,8 +2,11 @@
 #include "common/log/log.h"
 #include "common/rc.h"
 #include "sql/expr/tuple.h"
+#include "sql/expr/tuple_cell.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
+#include "storage/field/field.h"
+#include <deque>
 
 RC AggregationPhysicalOperator::open(Trx *trx)
 {
@@ -11,6 +14,28 @@ RC AggregationPhysicalOperator::open(Trx *trx)
     auto rc = child->open(trx);
     if (rc != RC::SUCCESS) {
       return rc;
+    }
+  }
+  // sort the aggr field
+  {
+    std::deque<Field> q;
+    for (auto it = aggr_fields_.begin(); it != aggr_fields_.end(); it++) {
+      if (it->get_aggr_type() == AggregationType::NONE) {
+        q.push_front(*it);
+      } else {
+        q.push_back(*it);
+      }
+    }
+    aggr_fields_.clear();
+    aggr_fields_.assign(q.begin(), q.end());
+  }
+  // reset the aggr_fields pos
+  {
+    group_by_fields_.clear();
+    for (auto field : aggr_fields_) {
+      if (field.get_aggr_type() == AggregationType::NONE) {
+        group_by_fields_.push_back(field);
+      }
     }
   }
   return RC::SUCCESS;
@@ -42,34 +67,23 @@ RC AggregationPhysicalOperator::next()
         value.set_int(0);
         group_by_values.push_back(value);
       }
-      bool is_all_null = true;
-      for (auto &value : group_by_values) {
-        if (!value.get_isnull()) {
-          is_all_null = false;
-          break;
-        }
-      }
       // for each field
       int pos = 0;
       for (int i = 0; i < aggr_fields_.size(); i++) {
         const auto &field = aggr_fields_[i];
-        auto       &map   = maps_.at(pos);
         if (field.get_aggr_type() == AggregationType::NONE) {
           continue;
         } else if (std::string(field.field_name()) == std::string("COUNT(*)")) {
-          auto v  = Value{};
-          auto rc = map(group_by_values, v, AggregationType::COUNT);
-        } else if (is_all_null) {
-          continue;
+          auto &map = maps_.at(pos);
+          auto  v   = Value{};
+          auto  rc  = map(group_by_values, v, AggregationType::COUNT);
         } else if (field.get_aggr_type() != AggregationType::NONE) {
+          auto &map = maps_.at(pos);
           Value value;
           auto  rc = tuple->find_cell({field.table_name(), field.meta()->name()}, value);
           if (rc != RC::SUCCESS) {
             LOG_WARN("Can't get value from tuple");
             return rc;
-          }
-          if (value.get_isnull()) {
-            continue;
           }
           rc = map(group_by_values, value, field.get_aggr_type());
           if (rc != RC::SUCCESS) {
@@ -111,8 +125,11 @@ RC AggregationPhysicalOperator::next()
 
   // get aggr result
   for (size_t i = 0; i < aggr_fields_.size(); i++) {
-    tuple_ptr->add_cell_spec(aggr_fields_[i].field_name());
-    const auto &aggr_result = iters_[pos_of_map]->second.second;
+    TupleCellSpec spec{aggr_fields_[i].table_name(),
+        aggr_fields_[i].meta() == nullptr ? aggr_fields_[i].field_name() : aggr_fields_[i].meta()->name(),
+        aggr_fields_[i].field_name()};
+    tuple_ptr->add_cell_spec(spec);
+    const auto &aggr_result = iters_.at(pos_of_map)->second.second;
     switch (aggr_fields_[i].get_aggr_type()) {
       case AggregationType::MAX:
       case AggregationType::MIN: {
@@ -155,8 +172,7 @@ RC AggregationPhysicalOperator::next()
         }
       } break;
       case AggregationType::NONE: {
-        auto t = iters_[pos_of_map]->second.first;
-        result.push_back(iters_[pos_of_map]->second.first[pos++]);
+        result.push_back(iters_.at(pos_of_map)->second.first[pos++]);
       } break;
     };
     if (aggr_fields_[i].get_aggr_type() != AggregationType::NONE) {
@@ -212,6 +228,9 @@ RC SimpleAggregationMap::add(const std::string &key, Value value, AggregationTyp
       }
     } break;
     case AggregationType::COUNT: {
+      if (value.get_isnull()) {
+        break;
+      }
       map_[key].second.first = false;  // indicate there are values not NULL
       map_[key].second.tot_count_++;
     } break;
@@ -253,9 +272,6 @@ RC SimpleAggregationMap::add(const std::string &key, Value value, AggregationTyp
 
 RC SimpleAggregationMap::operator()(const std::vector<Value> &keys, Value &value, AggregationType type)
 {
-  if (value.get_isnull()) {
-    return RC::SUCCESS;
-  }
   std::string key;
   for (auto &k : keys) {
     key += std::string(k.data(), k.length());

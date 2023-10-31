@@ -70,7 +70,7 @@ public:
         aggr_field_type_num++;
       }
     }
-    for(int i = 0;i < aggr_field_type_num;i++){
+    for (int i = 0; i < aggr_field_type_num; i++) {
       maps_.emplace_back();
     }
   }
@@ -91,10 +91,10 @@ private:
       iter++;
     }
   }
-  Tuple                   *current_tuple_ = nullptr;
-  const std::vector<Field> aggr_fields_;
-  const std::vector<Field> group_by_fields_;
-  bool                     is_executed_ = false;
+  Tuple             *current_tuple_ = nullptr;
+  std::vector<Field> aggr_fields_;
+  std::vector<Field> group_by_fields_;
+  bool               is_executed_ = false;
 
   bool                                        return_nothing_   = false;
   bool                                        sub_operator_eof_ = true;

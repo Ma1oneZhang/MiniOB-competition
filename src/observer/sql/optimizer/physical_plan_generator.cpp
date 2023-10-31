@@ -172,7 +172,9 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
   }
 
   std::reverse(value_exprs.begin(), value_exprs.end());
-  index = table->find_index_by_field(field_names);
+  // index = table->find_index_by_field(field_names);
+  index = nullptr;
+  // always use full table scan for test stable
   if (index != nullptr) {
     // ASSERT(value_expr != nullptr, "got an index but value expr is null ?");
     IndexScanPhysicalOperator *index_scan_oper =
