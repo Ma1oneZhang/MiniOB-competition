@@ -50,10 +50,15 @@ RC AggregationPhysicalOperator::next()
         }
       }
       // for each field
-      for (auto field : aggr_fields_) {
-        if (std::string(field.field_name()) == std::string("COUNT(*)")) {
+      int pos = 0;
+      for (int i = 0; i < aggr_fields_.size(); i++) {
+        const auto &field = aggr_fields_[i];
+        auto       &map   = maps_.at(pos);
+        if (field.get_aggr_type() == AggregationType::NONE) {
+          continue;
+        } else if (std::string(field.field_name()) == std::string("COUNT(*)")) {
           auto v  = Value{};
-          auto rc = map_(group_by_values, v, AggregationType::COUNT);
+          auto rc = map(group_by_values, v, AggregationType::COUNT);
         } else if (is_all_null) {
           continue;
         } else if (field.get_aggr_type() != AggregationType::NONE) {
@@ -66,29 +71,36 @@ RC AggregationPhysicalOperator::next()
           if (value.get_isnull()) {
             continue;
           }
-          rc = map_(group_by_values, value, field.get_aggr_type());
+          rc = map(group_by_values, value, field.get_aggr_type());
           if (rc != RC::SUCCESS) {
             return rc;
           }
         }
+        pos++;
       }
+      for (auto field : aggr_fields_) {}
     }
     if (sub_operator_eof_) {
       Value value;
       value.set_int(0);
-      map_[value.data()].second.tot_count_ = 0;
+      maps_[0][value.data()].second.tot_count_ = 0;
     }
-    iter_ = map_.begin();
+    for (auto &map : maps_) {
+      iters_.push_back(map.begin());
+    }
   }
 
-  if (iter_ == map_.end()) {
-    return RC::RECORD_EOF;
+  for (int i = 0; i < maps_.size(); i++) {
+    if (iters_[i] == maps_[i].end()) {
+      return RC::RECORD_EOF;
+    }
   }
   // start build a tuple
   auto               tuple_ptr = new AggregationTuple;
   std::vector<Value> result;
-  is_executed_ = true;
-  int pos      = 0;
+  is_executed_   = true;
+  int pos        = 0;
+  int pos_of_map = 0;
 
   // select a, count(id) from group_by group by a having count(id) > 2;
   // if empty table
@@ -100,7 +112,7 @@ RC AggregationPhysicalOperator::next()
   // get aggr result
   for (size_t i = 0; i < aggr_fields_.size(); i++) {
     tuple_ptr->add_cell_spec(aggr_fields_[i].field_name());
-    const auto &aggr_result = iter_->second.second;
+    const auto &aggr_result = iters_[pos_of_map]->second.second;
     switch (aggr_fields_[i].get_aggr_type()) {
       case AggregationType::MAX:
       case AggregationType::MIN: {
@@ -143,13 +155,17 @@ RC AggregationPhysicalOperator::next()
         }
       } break;
       case AggregationType::NONE: {
-        auto t = iter_->second.first;
-        result.push_back(iter_->second.first[pos++]);
+        auto t = iters_[pos_of_map]->second.first;
+        result.push_back(iters_[pos_of_map]->second.first[pos++]);
       } break;
     };
+    if (aggr_fields_[i].get_aggr_type() != AggregationType::NONE) {
+      pos_of_map++;
+    }
   }
+
   // iterate to next result
-  iter_++;
+  next_result();
   tuple_ptr->set_cells(result);
   current_tuple_ = tuple_ptr;
   return RC::SUCCESS;
@@ -242,7 +258,10 @@ RC SimpleAggregationMap::operator()(const std::vector<Value> &keys, Value &value
   }
   std::string key;
   for (auto &k : keys) {
-    key += k.data();
+    key += std::string(k.data(), k.length());
+  }
+  if (map_.find(key) == map_.end()) {
+    map_[key] = {};
   }
   map_[key].first = keys;
   return add(key, value, type);

@@ -163,7 +163,11 @@ void Value::set_value(const Value &value)
   }
 }
 
-void Value::set_isnull() { isnull_ = true; }
+void Value::set_isnull()
+{
+  num_value_.null_value_ = 0x7f7f7f7f;
+  isnull_                = true;
+}
 
 void Value::set_isnotnull() { isnull_ = false; }
 

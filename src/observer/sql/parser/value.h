@@ -100,6 +100,7 @@ private:
     float float_value_;
     bool  bool_value_;
     int   date_value_;
+    int   null_value_;
   } num_value_;
   std::string str_value_;
 };

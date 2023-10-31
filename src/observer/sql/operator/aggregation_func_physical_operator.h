@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sql/operator/physical_operator.h"
+#include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 
 #include <cstdint>
@@ -23,6 +24,7 @@ struct AggregationResult
 class SimpleAggregationMap
 {
 public:
+  SimpleAggregationMap() = default;
   RC    operator()(const std::vector<Value> &keys, Value &value, AggregationType type);
   auto &operator[](std::string key) { return map_[key]; }
   // for iterator and range-based for loop
@@ -60,7 +62,18 @@ class AggregationPhysicalOperator : public PhysicalOperator
 public:
   AggregationPhysicalOperator(std::vector<Field> &fields, std::vector<Field> &group_by)
       : aggr_fields_(fields), group_by_fields_(group_by)
-  {}
+  {
+    // get aggregation field type num
+    int aggr_field_type_num = 0;
+    for (auto &field : fields) {
+      if (field.get_aggr_type() != AggregationType::NONE) {
+        aggr_field_type_num++;
+      }
+    }
+    for(int i = 0;i < aggr_field_type_num;i++){
+      maps_.emplace_back();
+    }
+  }
   virtual ~AggregationPhysicalOperator() = default;
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::AGGREGATION; }
@@ -72,14 +85,20 @@ public:
   Tuple *current_tuple() override { return current_tuple_; }
 
 private:
+  void next_result()
+  {
+    for (auto &iter : iters_) {
+      iter++;
+    }
+  }
   Tuple                   *current_tuple_ = nullptr;
   const std::vector<Field> aggr_fields_;
   const std::vector<Field> group_by_fields_;
   bool                     is_executed_ = false;
 
-  bool                           return_nothing_   = false;
-  bool                           sub_operator_eof_ = true;
-  int                            wild_card_count_;
-  SimpleAggregationMap           map_;
-  SimpleAggregationMap::iterator iter_ = map_.begin();
+  bool                                        return_nothing_   = false;
+  bool                                        sub_operator_eof_ = true;
+  int                                         wild_card_count_;
+  std::vector<SimpleAggregationMap>           maps_;
+  std::vector<SimpleAggregationMap::iterator> iters_;
 };
