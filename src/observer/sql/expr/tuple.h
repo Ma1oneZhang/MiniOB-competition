@@ -198,6 +198,10 @@ public:
 
   const Record &record() const { return record_; }
 
+  const char * get_table_name() {
+    return table_->name();
+  }
+
 private:
   Record                 record_{};
   const Table           *table_ = nullptr;

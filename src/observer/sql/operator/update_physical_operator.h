@@ -17,6 +17,7 @@ public:
   PhysicalOperatorType type() const override { return PhysicalOperatorType::UPDATE; }
 
   RC open(Trx *trx) override;
+  RC open() override {close(); return open(trx_);}
   RC next() override;
   RC close() override;
 

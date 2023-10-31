@@ -20,8 +20,11 @@ See the Mulan PSL v2 for more details. */
 #include <string>
 
 #include "sql/parser/value.h"
+#include <unordered_map>
 
 class Expression;
+
+class Table;
 
 /**
  * @brief 用于orderBy语句
@@ -144,6 +147,7 @@ struct SelectSqlNode
 {
   std::vector<RelAttrSqlNode>   attributes;  ///< attributes in select clause
   std::vector<std::string>      relations;   ///< 查询的表
+  std::unordered_map<std::string, Table *> parent_query_tables;
   std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>      joinctions;  ///< join 条件
   std::vector<OrderBySqlNode>   orderby;     ///< orderby 条件

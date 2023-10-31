@@ -25,6 +25,9 @@ public:
   PhysicalOperatorType type() const override { return PhysicalOperatorType::AGGREGATION; }
 
   RC open(Trx *trx) override;
+  RC open() override {
+    close();
+    return open(trx_);}
   RC next() override;
   RC close() override;
 
@@ -35,4 +38,5 @@ private:
   const std::vector<Field>       fields_;
   std::vector<AggregationResult> result_;
   bool                           already_run_;
+  Trx                           *trx_;
 };

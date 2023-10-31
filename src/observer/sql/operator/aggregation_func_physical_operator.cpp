@@ -6,6 +6,10 @@
 
 RC AggregationPhysicalOperator::open(Trx *trx)
 {
+  trx_ = trx;
+  result_.clear();
+  already_run_ = false; 
+
   for (auto &child : children_) {
     auto rc = child->open(trx);
     if (rc != RC::SUCCESS) {
@@ -22,6 +26,7 @@ RC AggregationPhysicalOperator::next()
   }
   RC   rc    = RC::SUCCESS;
   auto child = children_[0].get();
+  child->set_parent_query_tuples(get_parent_query_tuples());
   result_.resize(fields_.size());
   while (RC::SUCCESS == (rc = child->next())) {
     already_run_ = true;
@@ -42,7 +47,6 @@ RC AggregationPhysicalOperator::next()
         }
       }
         
-
       switch (field.get_aggr_type()) {
         case AggregationType::MAX: {
           // Value value;
@@ -107,6 +111,7 @@ RC AggregationPhysicalOperator::next()
       }
     }
   }
+
   if (!already_run_ && RC::RECORD_EOF == rc) {
     return rc;
   }
@@ -176,6 +181,6 @@ RC AggregationPhysicalOperator::close()
       return rc;
     }
   }
-  delete current_tuple_;
+  // delete current_tuple_;
   return RC::SUCCESS;
 }

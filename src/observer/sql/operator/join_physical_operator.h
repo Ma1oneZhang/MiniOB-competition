@@ -32,6 +32,7 @@ public:
   PhysicalOperatorType type() const override { return PhysicalOperatorType::NESTED_LOOP_JOIN; }
 
   RC     open(Trx *trx) override;
+  RC open() override {return RC::SUCCESS;}
   RC     next() override;
   RC     close() override;
   Tuple *current_tuple() override;

@@ -35,6 +35,7 @@ public:
   PhysicalOperatorType type() const override { return PhysicalOperatorType::PROJECT; }
 
   RC open(Trx *trx) override;
+  RC open() override {close(); return open(trx_);}
   RC next() override;
   RC close() override;
 
@@ -44,4 +45,6 @@ public:
 
 private:
   ProjectTuple tuple_;
+
+  Trx         *trx_;
 };

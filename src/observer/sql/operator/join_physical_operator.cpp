@@ -89,6 +89,7 @@ Tuple *NestedLoopJoinPhysicalOperator::current_tuple() { return joined_tuple_; }
 RC NestedLoopJoinPhysicalOperator::left_next()
 {
   RC rc = RC::SUCCESS;
+  left_->set_parent_query_tuples(get_parent_query_tuples());
   rc    = left_->next();
   if (rc != RC::SUCCESS) {
     return rc;
@@ -120,6 +121,7 @@ RC NestedLoopJoinPhysicalOperator::right_next()
     round_done_ = false;
   }
 
+  right_->set_parent_query_tuples(get_parent_query_tuples());
   rc = right_->next();
   if (rc != RC::SUCCESS) {
     if (rc == RC::RECORD_EOF) {

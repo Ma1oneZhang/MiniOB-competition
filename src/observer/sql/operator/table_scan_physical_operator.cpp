@@ -21,6 +21,7 @@ using namespace std;
 
 RC TableScanPhysicalOperator::open(Trx *trx)
 {
+  record_scanner_ = RecordFileScanner();
   RC rc = table_->get_record_scanner(record_scanner_, trx, readonly_);
   trx_  = trx;
 
@@ -94,7 +95,7 @@ RC TableScanPhysicalOperator::next()
   return rc;
 }
 
-RC TableScanPhysicalOperator::close() { return record_scanner_.close_scan(); }
+RC TableScanPhysicalOperator::close() { tuples_.clear(); return record_scanner_.close_scan(); }
 
 Tuple *TableScanPhysicalOperator::current_tuple() { return tuples_.back(); }
 
@@ -110,6 +111,12 @@ RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
   RC    rc = RC::SUCCESS;
   Value value;
   for (unique_ptr<Expression> &expr : predicates_) {
+    // append current tuple into parent query tuples
+    std::unordered_map<std::string, Tuple *> parent_query_tuples = get_parent_query_tuples();
+    std::string table_name = tuple.get_table_name();
+    parent_query_tuples[table_name] = &tuple;
+    expr->set_parent_query_tuples(parent_query_tuples);
+
     rc = expr->get_value(tuple, value);
     if (rc != RC::SUCCESS) {
       return rc;

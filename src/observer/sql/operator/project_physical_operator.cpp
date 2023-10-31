@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 
 RC ProjectPhysicalOperator::open(Trx *trx)
 {
+  trx_ = trx;
   if (children_.empty()) {
     return RC::SUCCESS;
   }
@@ -38,6 +39,7 @@ RC ProjectPhysicalOperator::next()
   if (children_.empty()) {
     return RC::RECORD_EOF;
   }
+  children_[0]->set_parent_query_tuples(get_parent_query_tuples());
   return children_[0]->next();
 }
 

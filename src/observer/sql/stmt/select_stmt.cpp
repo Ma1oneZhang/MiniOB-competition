@@ -227,6 +227,13 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
+  // append tables in parent query
+  for (const auto& pair : select_sql.parent_query_tables) {
+    if(table_map.count(pair.first) == 0) {
+      table_map[pair.first] = pair.second;
+    }
+  }
+
   LOG_INFO("got %d tables in from stmt and %d fields in query stmt", tables.size(), query_fields.size());
 
   Table *default_table = nullptr;

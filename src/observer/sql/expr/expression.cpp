@@ -22,7 +22,18 @@ using namespace std;
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value)
 {
-  return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
+  RC rc = tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
+
+  if (rc == RC::NOTFOUND) {
+    for(auto& pair: get_parent_query_tuples()) {
+      rc = pair.second->find_cell(TupleCellSpec(table_name(), field_name()), value);
+      if (rc == RC::SUCCESS) {
+        break;
+      }
+    }
+  }
+
+  return rc;
 }
 
 RC ValueExpr::get_value(const Tuple &tuple, Value &value)
@@ -147,21 +158,114 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   return rc;
 }
 
-RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool &result) const
+RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool &result)
 {
   RC rc;
-  RowTuple tuple;
   Value left_value;
   Value right_value;
 
-  if (left_->type() == ExprType::SUB_QUERY & right_->type() != ExprType::SUB_QUERY) {
+  if (left_->type() == ExprType::SUB_QUERY & right_->type() == ExprType::SUB_QUERY) {
+    OperExpr *loper = dynamic_cast<OperExpr*>(left_.get());
+    rc = loper->catch_subquery_results();
+    if (rc != RC::SUCCESS)
+      return rc;
+    
+    OperExpr *roper = dynamic_cast<OperExpr*>(right_.get());
+    rc = roper->catch_subquery_results();
+    if (rc != RC::SUCCESS)
+      return rc;
+
+    std::vector<Value> &left_subquery_results = loper->get_subquery_results();
+    std::vector<Value> &right_subquery_results = roper->get_subquery_results();
+    switch (comp_) {
+      case CompOp::IN_OP: {
+        int left_row_count = left_subquery_results.size();
+        if(left_row_count > 1) {
+          return RC::SUBQUERY_TOO_MANY_ROWS;
+        }
+        left_value = left_subquery_results[0];
+
+        result = false;
+        for(int i=0; i< right_subquery_results.size();i++) {
+          right_value = right_subquery_results[i];
+          bool bool_value = false;
+          rc              = compare_value(left_value, right_value, bool_value);
+          if (rc == RC::SUCCESS) {
+            if (bool_value) {
+              result = true;
+              return rc;
+            }
+          } else {
+            LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+            return rc;
+          }
+        }
+        return RC::SUCCESS;
+      } break;
+      case CompOp::NOT_IN_OP: {
+        int left_row_count = left_subquery_results.size();
+        if(left_row_count > 1) {
+          return RC::SUBQUERY_TOO_MANY_ROWS;
+        }
+        left_value = left_subquery_results[0];
+
+        result = true;
+        for(int i=0; i< right_subquery_results.size();i++) {
+          right_value = right_subquery_results[i];
+          bool bool_value = false;
+          rc              = compare_value(left_value, right_value, bool_value);
+          if (rc == RC::SUCCESS) {
+            if (bool_value) {
+              result = false;
+              return rc;
+            }
+          } else {
+            LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+            return rc;
+          }
+        }
+        return RC::SUCCESS;
+      } break;
+      case CompOp::EQUAL_TO: 
+      case CompOp::GREAT_EQUAL:
+      case CompOp::GREAT_THAN:
+      case CompOp::LESS_EQUAL:
+      case CompOp::LESS_THAN:
+      case CompOp::NOT_EQUAL: {
+        // check the row number
+        int left_row_count = left_subquery_results.size();
+        if(left_row_count > 1) {
+          return RC::SUBQUERY_TOO_MANY_ROWS;
+        }
+        left_value = left_subquery_results[0];
+
+        int right_row_count = right_subquery_results.size();
+        if(right_row_count > 1) {
+          return RC::SUBQUERY_TOO_MANY_ROWS;
+        }
+        
+
+        // set default result
+        result = false;
+        
+        if (left_row_count == 1 && right_row_count==1) {
+          left_value = left_subquery_results[0];
+          right_value = right_subquery_results[0];
+          rc          = compare_value(left_value, right_value, result);
+          if (rc != RC::SUCCESS)
+            return rc;
+        }
+        
+        return RC::SUCCESS;
+      } break;
+    }
+  } else if (left_->type() == ExprType::SUB_QUERY & right_->type() != ExprType::SUB_QUERY) {
     // open sub-query operator, execute sub-query if has not executed
     OperExpr * oper = dynamic_cast<OperExpr*>(left_.get());
-    if (!oper->has_catched_subquery()){
-      rc = oper->catch_subquery_results();
-      if (rc != RC::SUCCESS)
-        return rc;
-    }
+    rc = oper->catch_subquery_results();
+    if (rc != RC::SUCCESS)
+      return rc;
+    
     std::vector<Value> &subquery_results = oper->get_subquery_results();
     switch (comp_) {
       case CompOp::IN_OP: {
@@ -229,11 +333,10 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
   } else if (left_->type() != ExprType::SUB_QUERY & right_->type() == ExprType::SUB_QUERY) {
     // open sub-query operator, execute sub-query if has not executed
     OperExpr * oper = dynamic_cast<OperExpr*>(right_.get());
-    if (!oper->has_catched_subquery()){
-      rc = oper->catch_subquery_results();
-      if (rc != RC::SUCCESS)
-        return rc;
-    }
+    rc = oper->catch_subquery_results();
+    if (rc != RC::SUCCESS)
+      return rc;
+    
     std::vector<Value> &subquery_results = oper->get_subquery_results();
     switch (comp_) {
       case CompOp::IN_OP: {
@@ -513,6 +616,9 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value)
   Value left_value;
   Value right_value;
 
+  left_->set_parent_query_tuples(get_parent_query_tuples());
+  right_->set_parent_query_tuples(get_parent_query_tuples());
+
   if (left_->type() == ExprType::VALUE | left_->type() == ExprType::FIELD) {
     rc = left_->get_value(tuple, left_value);
     if (rc != RC::SUCCESS) {
@@ -571,6 +677,7 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value)
 
   Value tmp_value;
   for (const unique_ptr<Expression> &expr : children_) {
+    expr->set_parent_query_tuples(get_parent_query_tuples());
     rc = expr->get_value(tuple, tmp_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value by child expression. rc=%s", strrc(rc));
@@ -725,11 +832,10 @@ RC ArithmeticExpr::try_get_value(Value &value) const
 // try to get value from sub-query
 RC OperExpr::get_value(const Tuple &tuple, Value &value)
 {
-  unique_ptr<PhysicalOperator> &physic_oper_ptr = get_physic_oper();
-  PhysicalOperator* physic_oper = physic_oper_ptr.get();
-  RC rc = physic_oper->next();
+  physic_oper_->set_parent_query_tuples(get_parent_query_tuples());
+  RC rc = physic_oper_->next();
   if (rc == RC::SUCCESS){
-    Tuple* sub_query_tuple = physic_oper->current_tuple();
+    Tuple* sub_query_tuple = physic_oper_->current_tuple();
     int cell_num = sub_query_tuple->cell_num();
     if (cell_num > 1) {
       return RC::SUBQUERY_TOO_MANY_COLUMNS;
@@ -744,16 +850,21 @@ RC OperExpr::get_value(const Tuple &tuple, Value &value)
 RC OperExpr::catch_subquery_results(){
   RC rc;
   RowTuple tuple;
+
+  // reopen operator
+  rc = physic_oper_->open();
+  if (rc != RC::SUCCESS)
+    return rc;
+
+  // start to load data
+  subquery_results.clear();
   while(true) {
     Value value;
     rc = get_value(tuple, value);
     if(rc == RC::SUCCESS)
       subquery_results.push_back(value);
     else if (rc == RC::RECORD_EOF)
-    {
-      catched = true;
       break;
-    }
     else
       return rc;
   }
