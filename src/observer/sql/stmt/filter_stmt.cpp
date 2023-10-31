@@ -110,10 +110,12 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
       }
       if (field->type() == AttrType::DATES &&
           (condition.comp != CompOp::IS_NOT_NULL && condition.comp != CompOp::IS_NULL)) {
-        auto value  = condition.right_value;
-        auto status = value.match_field_type(AttrType::DATES);
-        if (!status) {
-          return RC::INVALID_ARGUMENT;
+        auto value = condition.right_value;
+        if (!value.get_isnull()) {
+          auto status = value.match_field_type(AttrType::DATES);
+          if (!status) {
+            return RC::INVALID_ARGUMENT;
+          }
         }
       }
       filter_obj.init_attr(Field(table, field, condition.left_attr.aggregation_type));
