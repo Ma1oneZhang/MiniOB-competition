@@ -106,6 +106,8 @@ INNER                                   RETURN_TOKEN(INNER);
 JOIN                                    RETURN_TOKEN(JOIN);
 ORDER                                   RETURN_TOKEN(ORDER);
 BY                                      RETURN_TOKEN(BY);
+HAVING                                  RETURN_TOKEN(HAVING);
+GROUP                                   RETURN_TOKEN(GROUP);
 ASC                                     RETURN_TOKEN(ASC);
 DESC                                    RETURN_TOKEN(DESC);
 LIKE                                    RETURN_TOKEN(LIKE);
@@ -131,6 +133,7 @@ EXPLAIN                                 RETURN_TOKEN(EXPLAIN);
 IS                                      RETURN_TOKEN(IS);
 NULL                                    RETURN_TOKEN(NULL_TOKEN);
 IN                                      RETURN_TOKEN(IN);
+
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);
