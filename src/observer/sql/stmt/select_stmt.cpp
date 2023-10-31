@@ -387,12 +387,14 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // everything alright
   SelectStmt        *select_stmt = new SelectStmt();
   std::vector<Field> having;
-  for (auto having_field : having_stmt->filter_units()) {
-    if (having_field->left().is_attr == 1) {
-      having.push_back(having_field->left().field);
-    }
-    if (having_field->right().is_attr == 1) {
-      having.push_back(having_field->right().field);
+  if (having_stmt) {
+    for (auto having_field : having_stmt->filter_units()) {
+      if (having_field->left().is_attr == 1) {
+        having.push_back(having_field->left().field);
+      }
+      if (having_field->right().is_attr == 1) {
+        having.push_back(having_field->right().field);
+      }
     }
   }
   select_stmt->tables_ = std::vector<Table *>(tables.begin(), tables.end());
