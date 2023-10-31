@@ -15,6 +15,7 @@ struct AggregationResult
   int64_t int_sum_      = 0;
   double  float_sum_    = 0;
   bool    is_float_sum_ = false;
+  bool    is_null       = false;
   // for min max
   Value max_or_min{};
   bool  first = true;

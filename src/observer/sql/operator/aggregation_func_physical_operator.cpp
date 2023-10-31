@@ -243,6 +243,9 @@ RC SimpleAggregationMap::add(const std::string &key, Value value, AggregationTyp
       map_[key].second.float_sum_ += value.get_float();
     } break;
     case AggregationType::SUM: {
+      if (value.get_isnull()) {
+        break;
+      }
       map_[key].second.first = false;  // indicate there are values not NULL
       switch (value.attr_type()) {
         case INTS: {
