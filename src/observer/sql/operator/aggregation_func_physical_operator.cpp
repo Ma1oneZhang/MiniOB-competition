@@ -96,6 +96,10 @@ RC AggregationPhysicalOperator::next()
       }
       for (auto field : aggr_fields_) {}
     }
+    
+    if (rc != RC::SUCCESS && rc != RC::RECORD_EOF)
+      return rc;
+
     if (sub_operator_eof_) {
       Value value;
       value.set_int(0);
