@@ -724,7 +724,7 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     return rc;
   }
   switch (arithmetic_type_) {
-    case Type::ADD: {   
+    case Type::ADD: {
       if (target_type == AttrType::INTS) {
         value.set_int(left_value.get_int() + right_value.get_int());
       } else {

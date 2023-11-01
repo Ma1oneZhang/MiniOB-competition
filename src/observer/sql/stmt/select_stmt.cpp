@@ -360,7 +360,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
           // 递归获取所需表达式字段
           auto fields = select_sql.attributes[i]->get_rel_attr_sql_node();
           for (auto field : fields) {
-            if (field.aggregation_type != AggregationType::NONE) {
+            if (field.aggregation_type == AggregationType::NONE) {
               return RC::INVALID_ARGUMENT;
             }
           }
