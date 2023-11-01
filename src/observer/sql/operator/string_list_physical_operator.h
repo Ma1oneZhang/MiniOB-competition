@@ -58,6 +58,8 @@ public:
     return RC::SUCCESS;
   }
 
+  RC open() override {return RC::SUCCESS;}
+
   RC next() override
   {
     if (!started_) {

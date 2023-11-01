@@ -66,6 +66,7 @@ RC SortPhysicalOperator::next()
 {
   if (pos == -1) {
     RC rc = RC::SUCCESS;
+    child_->set_parent_query_tuples(get_parent_query_tuples());
     while (RC::SUCCESS == (rc = child_->next())) {
       tuples.push_back(child_->current_tuple());
     }

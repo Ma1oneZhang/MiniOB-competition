@@ -32,6 +32,7 @@ public:
   PhysicalOperatorType type() const override { return PhysicalOperatorType::ORDER_BY; }
 
   RC     open(Trx *trx) override;
+  RC     open() override {close(); return open(trx_);}
   RC     next() override;
   RC     close() override;
   Tuple *current_tuple() override;

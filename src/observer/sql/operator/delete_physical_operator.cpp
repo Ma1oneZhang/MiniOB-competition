@@ -46,6 +46,7 @@ RC DeletePhysicalOperator::next()
   }
 
   PhysicalOperator *child = children_[0].get();
+  child->set_parent_query_tuples(get_parent_query_tuples());
   std::vector<RowTuple *> tuples;
   while (RC::SUCCESS == (rc = child->next())) {
     Tuple *tuple = child->current_tuple();

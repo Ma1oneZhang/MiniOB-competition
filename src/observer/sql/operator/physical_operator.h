@@ -18,12 +18,15 @@ See the Mulan PSL v2 for more details. */
 #include <memory>
 #include <string>
 
+#include <unordered_map>
+
+class Tuple;
+
 #include "common/rc.h"
 #include "storage/field/field.h"
 #include "sql/parser/value.h"
 // #include "sql/expr/tuple.h"
 
-class Tuple;
 
 class Record;
 class TupleCellSpec;
@@ -76,6 +79,7 @@ public:
   virtual PhysicalOperatorType type() const = 0;
 
   virtual RC open(Trx *trx) = 0;
+  virtual RC open()         = 0;
   virtual RC next()         = 0;
   virtual RC close()        = 0;
 
@@ -85,6 +89,11 @@ public:
 
   std::vector<std::unique_ptr<PhysicalOperator>> &children() { return children_; }
 
+  RC set_parent_query_tuples(std::unordered_map<std::string, Tuple *> parent_query_tuples) {parent_query_tuples_ = parent_query_tuples; return RC::SUCCESS;}
+
+  std::unordered_map<std::string, Tuple *> get_parent_query_tuples() {return parent_query_tuples_; }
+
 protected:
   std::vector<std::unique_ptr<PhysicalOperator>> children_;
+  std::unordered_map<std::string, Tuple *> parent_query_tuples_;
 };

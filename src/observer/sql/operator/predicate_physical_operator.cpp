@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/record/record.h"
 #include "sql/stmt/filter_stmt.h"
 #include "storage/field/field.h"
+#include "sql/expr/tuple.h"
 
 PredicatePhysicalOperator::PredicatePhysicalOperator(std::unique_ptr<Expression> expr) : expression_(std::move(expr))
 {
@@ -26,6 +27,7 @@ PredicatePhysicalOperator::PredicatePhysicalOperator(std::unique_ptr<Expression>
 RC PredicatePhysicalOperator::open(Trx *trx)
 {
   RC rc;
+  trx_ = trx;
   // open operator of sub-query in expression
   // Generate physical operators for sub-query stored in expression, the expre is a ConjunctionExpr
   if (expression_.get()->type() == ExprType::CONJUNCTION) {
@@ -94,6 +96,7 @@ RC PredicatePhysicalOperator::next()
   RC rc = RC::SUCCESS;
   PhysicalOperator *oper = children_.front().get();
 
+  oper->set_parent_query_tuples(get_parent_query_tuples());
   while (RC::SUCCESS == (rc = oper->next())) {
     Tuple *tuple = oper->current_tuple();
     if (nullptr == tuple) {
@@ -101,6 +104,12 @@ RC PredicatePhysicalOperator::next()
       LOG_WARN("failed to get tuple from operator");
       break;
     }
+
+    // append current tuple into parent query tuples
+    std::unordered_map<std::string, Tuple *> parent_query_tuples = get_parent_query_tuples();
+    std::string table_name = dynamic_cast<RowTuple *>(tuple)->get_table_name();
+    parent_query_tuples[table_name] = tuple;
+    expression_->set_parent_query_tuples(parent_query_tuples);
 
     Value value;
     rc = expression_->get_value(*tuple, value);

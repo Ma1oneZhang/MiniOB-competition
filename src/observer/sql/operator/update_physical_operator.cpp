@@ -29,6 +29,7 @@ RC UpdatePhysicalOperator::next()
     return RC::RECORD_EOF;
   }
   PhysicalOperator *child = children_.front().get();
+  child->set_parent_query_tuples(get_parent_query_tuples());
   while (RC::SUCCESS == (rc = child->next())) {
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {

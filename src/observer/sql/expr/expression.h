@@ -100,8 +100,12 @@ public:
   virtual std::string name() const { return name_; }
   virtual void        set_name(std::string name) { name_ = name; }
 
+  std::unordered_map<std::string, Tuple *> get_parent_query_tuples() {return parent_query_tuples_; };
+  RC set_parent_query_tuples(unordered_map<std::string, Tuple *> parent_query_tuples) {parent_query_tuples_ = parent_query_tuples; return RC::SUCCESS;}
+
 private:
   std::string name_;
+  std::unordered_map<std::string, Tuple *> parent_query_tuples_;
 };
 
 /**
@@ -220,15 +224,12 @@ public:
 
   RC catch_subquery_results();
 
-  bool has_catched_subquery() { return catched; }
-
   std::vector<Value> &get_subquery_results() { return subquery_results; }
 
 private:
   unique_ptr<LogicalOperator>  logic_oper_;
   unique_ptr<PhysicalOperator> physic_oper_;
   std::vector<Value>           subquery_results;
-  bool                         catched = false;
  };
 
 /**
@@ -291,7 +292,7 @@ public:
    */
   RC compare_value(const Value &left, const Value &right, bool &value) const;
 
-  RC compare_sub_query(const Value &left, const Value &right, bool &value) const;
+  RC compare_sub_query(const Value &left, const Value &right, bool &value);
 
   RC compare_valuelist(const Value &left, const Value &right, bool &value) const;
 

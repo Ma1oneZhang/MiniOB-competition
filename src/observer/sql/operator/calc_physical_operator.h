@@ -41,6 +41,7 @@ public:
   }
 
   RC open(Trx *trx) override { return RC::SUCCESS;}
+  RC open() override {return RC::SUCCESS;}
   RC next() override
   {
     RC rc = RC::SUCCESS;

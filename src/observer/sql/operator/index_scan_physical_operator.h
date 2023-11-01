@@ -35,6 +35,7 @@ public:
   std::string param() const override;
 
   RC open(Trx *trx) override;
+  RC open() override {return RC::SUCCESS;}
   RC next() override;
   RC close() override;
 

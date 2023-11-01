@@ -10,6 +10,10 @@
 
 RC AggregationPhysicalOperator::open(Trx *trx)
 {
+  trx_ = trx;
+  result_.clear();
+  already_run_ = false; 
+
   for (auto &child : children_) {
     auto rc = child->open(trx);
     if (rc != RC::SUCCESS) {
@@ -44,7 +48,6 @@ RC AggregationPhysicalOperator::open(Trx *trx)
 RC AggregationPhysicalOperator::next()
 {
   RC rc = RC::SUCCESS;
-
   if (!is_executed_) {
     auto child = children_[0].get();
     while (RC::SUCCESS == (rc = child->next())) {
@@ -54,7 +57,6 @@ RC AggregationPhysicalOperator::next()
         LOG_WARN("failed to get current record: %s", strrc(rc));
         return rc;
       }
-      // for each field
       std::vector<Value> group_by_values;
       if (!group_by_fields_.empty()) {
         for (auto field : group_by_fields_) {
@@ -103,7 +105,6 @@ RC AggregationPhysicalOperator::next()
       iters_.push_back(map.begin());
     }
   }
-
   for (int i = 0; i < maps_.size(); i++) {
     if (iters_[i] == maps_[i].end()) {
       return RC::RECORD_EOF;
@@ -192,7 +193,7 @@ RC AggregationPhysicalOperator::close()
       return rc;
     }
   }
-  delete current_tuple_;
+  // delete current_tuple_;
   return RC::SUCCESS;
 }
 
