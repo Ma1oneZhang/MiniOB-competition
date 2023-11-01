@@ -311,8 +311,11 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // create join conditions in `join` statement
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
     std::vector<ConditionSqlNode> const &tmp_vec_condi = select_sql.joinctions[i].join_conditions;
-    for (auto &j : tmp_vec_condi)
+    for (auto &j : tmp_vec_condi) {
+      j.left_expr->set_table_name(tables);
+      j.right_expr->set_table_name(tables);
       conditions.emplace_back(j);
+    }
   }
 
   // create filter statement in `where` statement
@@ -368,6 +371,9 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
 
   // check the group by condition is valid
   std::vector<Field> group_by_;
+  for (auto i : select_sql.groupby) {
+    i->set_table_name(tables);
+  }
   if (select_sql.groupby.size() != 0) {
     // fresh code
     for (auto i : select_sql.groupby) {
