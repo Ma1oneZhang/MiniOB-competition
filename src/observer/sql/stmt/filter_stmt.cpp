@@ -127,6 +127,9 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     filter_obj.init_value(condition.left_value);
     filter_unit->set_left(filter_obj);
   } else if (condition.left_is_attr == 2) {
+    // append tables to sub-qeury 
+    condition.left_sub_query->selection.parent_query_tables = *tables;
+
     Stmt *stmt = nullptr;
     rc         = Stmt::create_stmt(db, *condition.left_sub_query, stmt);
 

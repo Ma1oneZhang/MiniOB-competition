@@ -82,6 +82,20 @@ public:
 
   RC open(Trx *trx) override;
   RC open() override { return open(trx_); }
+  RC reset()
+  {
+    current_tuple_ = nullptr;
+    is_executed_ = false;
+    return_nothing_ = false;
+    sub_operator_eof_ = true;
+    wild_card_count_ = 0;
+    iters_.clear();
+    std::vector<SimpleAggregationMap> new_map;
+    for(int i=0; i<maps_.size(); i++) new_map.emplace_back();
+    maps_ = new_map;
+    return RC::SUCCESS;
+  }
+  
   RC close() override;
   RC next() override;
 

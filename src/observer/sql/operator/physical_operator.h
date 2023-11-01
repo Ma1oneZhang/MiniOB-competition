@@ -27,7 +27,6 @@ class Tuple;
 #include "sql/parser/value.h"
 // #include "sql/expr/tuple.h"
 
-
 class Record;
 class TupleCellSpec;
 class Trx;

@@ -53,10 +53,7 @@ public:
     return PhysicalOperatorType::STRING_LIST;
   }
 
-  RC open(Trx *) override
-  {
-    return RC::SUCCESS;
-  }
+  RC open(Trx *) override { return RC::SUCCESS; }
 
   RC open() override {return RC::SUCCESS;}
 

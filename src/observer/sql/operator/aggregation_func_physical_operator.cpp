@@ -11,6 +11,7 @@
 RC AggregationPhysicalOperator::open(Trx *trx)
 {
   trx_ = trx;
+  reset();
 
   for (auto &child : children_) {
     auto rc = child->open(trx);
@@ -48,6 +49,7 @@ RC AggregationPhysicalOperator::next()
   RC rc = RC::SUCCESS;
   if (!is_executed_) {
     auto child = children_[0].get();
+    child->set_parent_query_tuples(get_parent_query_tuples());
     while (RC::SUCCESS == (rc = child->next())) {
       sub_operator_eof_ = false;
       Tuple *tuple      = child->current_tuple();

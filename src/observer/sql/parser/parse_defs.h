@@ -23,7 +23,6 @@ See the Mulan PSL v2 for more details. */
 #include <unordered_map>
 
 class Expression;
-
 class Table;
 
 /**
