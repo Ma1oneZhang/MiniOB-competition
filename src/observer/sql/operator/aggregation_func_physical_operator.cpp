@@ -11,8 +11,6 @@
 RC AggregationPhysicalOperator::open(Trx *trx)
 {
   trx_ = trx;
-  result_.clear();
-  already_run_ = false; 
 
   for (auto &child : children_) {
     auto rc = child->open(trx);

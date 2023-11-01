@@ -3,6 +3,7 @@
 #include "sql/operator/physical_operator.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
+#include "storage/trx/trx.h"
 
 #include <cstdint>
 #include <unordered_map>
@@ -80,11 +81,9 @@ public:
   PhysicalOperatorType type() const override { return PhysicalOperatorType::AGGREGATION; }
 
   RC open(Trx *trx) override;
-  RC open() override {
-    close();
-    return open(trx_);}
-  RC next() override;
+  RC open() override { return open(trx_); }
   RC close() override;
+  RC next() override;
 
   Tuple *current_tuple() override { return current_tuple_; }
 
@@ -95,11 +94,11 @@ private:
       iter++;
     }
   }
-  Tuple             *current_tuple_ = nullptr;
-  std::vector<Field> aggr_fields_;
-  std::vector<Field> group_by_fields_;
-  bool               is_executed_ = false;
-
+  Tuple                                      *current_tuple_ = nullptr;
+  std::vector<Field>                          aggr_fields_;
+  std::vector<Field>                          group_by_fields_;
+  bool                                        is_executed_      = false;
+  Trx                                        *trx_              = nullptr;
   bool                                        return_nothing_   = false;
   bool                                        sub_operator_eof_ = true;
   int                                         wild_card_count_;

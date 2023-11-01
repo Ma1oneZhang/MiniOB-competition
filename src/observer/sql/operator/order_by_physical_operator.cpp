@@ -3,7 +3,6 @@
 #include "sql/expr/tuple.h"
 #include "sql/operator/physical_operator.h"
 #include "storage/trx/trx.h"
-// #include <boost/sort/parallel_stable_sort/parallel_stable_sort.hpp>
 #include "sql/operator/order_by_physical_operator.h"
 #include <chrono>
 #include <vector>
