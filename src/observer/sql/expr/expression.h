@@ -147,9 +147,6 @@ public:
   virtual RC      set_table_name(std::vector<Table *> &query_tables) override
   {
     if (sql_node_.relation_name != "") {
-      if (sql_node_.attribute_name == "*") {
-        return RC::SUCCESS;
-      }
       for (auto table : query_tables) {
         if (table->name() == sql_node_.relation_name) {
           field_ = Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()));
@@ -157,6 +154,9 @@ public:
         }
       }
     } else {
+      if (sql_node_.attribute_name == "*") {
+        return RC::SUCCESS;
+      }
       for (auto table : query_tables) {
         if (table->table_meta().field(sql_node_.attribute_name.c_str())) {
           field_ = Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()));
