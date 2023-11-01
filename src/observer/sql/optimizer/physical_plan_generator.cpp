@@ -217,6 +217,9 @@ RC PhysicalPlanGenerator::create_plan(PredicateLogicalOperator &pred_oper, uniqu
     for (int i = 0; i < child_exprs.size(); i++) {
       if (child_exprs[i]->type() == ExprType::COMPARISON) {
         ComparisonExpr *comp_expr = static_cast<ComparisonExpr *>(child_exprs[i].get());
+        if (comp_expr->comp() == CompOp::IS_NULL || comp_expr->comp() == CompOp::IS_NOT_NULL) {
+          continue;
+        }
         if (comp_expr->left()->type() == ExprType::SUB_QUERY) {  // this expr contain sub-query
           // restore logical operator
           OperExpr                    *oper_expr  = static_cast<OperExpr *>((comp_expr->left()).get());
@@ -227,7 +230,6 @@ RC PhysicalPlanGenerator::create_plan(PredicateLogicalOperator &pred_oper, uniqu
           RC                           rc = create(*logic_oper, physic_oper);
           oper_expr->set_physic_oper(physic_oper);
         }
-
         if (comp_expr->right()->type() == ExprType::SUB_QUERY) {  // this expr contain sub-query
           // restore logical operator
           OperExpr                    *oper_expr  = static_cast<OperExpr *>((comp_expr->right()).get());

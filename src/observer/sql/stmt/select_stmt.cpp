@@ -95,7 +95,25 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     }
     table_map[table_name] = table;
   }
+  // add the join's table to the tables
+  for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
+    auto &table_name = select_sql.joinctions[i].join_relation;
+    if ("" == table_name) {
+      LOG_WARN("invalid argument. join relation name is null. index=%d", i);
+      return RC::INVALID_ARGUMENT;
+    }
 
+    Table *table = db->find_table(table_name.c_str());
+    if (nullptr == table) {
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name.c_str());
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+
+    if (std::find(tables.begin(), tables.end(), table) == tables.end()) {
+      tables.emplace_back(table);
+    }
+    table_map[table_name] = table;
+  }
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
   auto               checker = [&](RelAttrSqlNode &relation_attr, bool is_query_field) {
@@ -187,25 +205,6 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       }
     } else {
       // Have no aggregation function
-      // add the join's table to the tables
-      for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
-        auto &table_name = select_sql.joinctions[i].join_relation;
-        if ("" == table_name) {
-          LOG_WARN("invalid argument. join relation name is null. index=%d", i);
-          return RC::INVALID_ARGUMENT;
-        }
-
-        Table *table = db->find_table(table_name.c_str());
-        if (nullptr == table) {
-          LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name.c_str());
-          return RC::SCHEMA_TABLE_NOT_EXIST;
-        }
-
-        if (std::find(tables.begin(), tables.end(), table) == tables.end()) {
-          tables.emplace_back(table);
-        }
-        table_map[table_name] = table;
-      }
       // check if the relation_attr is valid
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
           0 == strcmp(relation_attr.attribute_name.c_str(), "*")) {
@@ -443,7 +442,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     rc = FilterStmt::create(db,
         default_table,
         &table_map,
-        select_sql.having.data(),
+        const_cast<ConditionSqlNode *>(select_sql.having.data()),
         static_cast<int>(select_sql.having.size()),
         having_stmt);
     if (rc != RC::SUCCESS) {

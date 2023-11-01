@@ -6,3 +6,4 @@ insert into join_table_1 values (1, 'zzy');
 insert into join_table_2 values (1, 22); 
 insert into join_table_2 values (1, 22); 
 Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id;
+Select join_table_1.id, join_table_1.name, join_table_2.age from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id;

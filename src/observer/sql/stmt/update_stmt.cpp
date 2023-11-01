@@ -107,7 +107,8 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
   FilterStmt *filter = nullptr;
   if (update.conditions.size() != 0) {
-    auto rc = FilterStmt::create(db, table, nullptr, update.conditions.data(), update.conditions.size(), filter);
+    auto rc = FilterStmt::create(
+        db, table, nullptr, const_cast<ConditionSqlNode *>(update.conditions.data()), update.conditions.size(), filter);
     if (rc != RC::SUCCESS) {
       return rc;
     }
