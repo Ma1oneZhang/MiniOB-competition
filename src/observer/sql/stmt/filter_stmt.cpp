@@ -98,23 +98,23 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   filter_unit = new FilterUnit;
   if (condition.left_is_attr == 4) {
     if (condition.left_expr->type() == ExprType::FIELD) {
-      auto field_expr     = static_cast<FieldExpr *>(condition.left_expr);
-      condition.left_attr = field_expr->get_sql_node();
+      auto field_expr        = static_cast<FieldExpr *>(condition.left_expr);
+      condition.left_attr    = field_expr->get_sql_node();
       condition.left_is_attr = 1;
     } else if (condition.left_expr->type() == ExprType::VALUE) {
-      auto value_expr      = static_cast<ValueExpr *>(condition.right_expr);
-      condition.left_value = value_expr->get_value();
+      auto value_expr = static_cast<ValueExpr *>(condition.left_expr);
+      value_expr->get_value(condition.left_value);
       condition.left_is_attr = 0;
     }
   }
   if (condition.right_is_attr == 4) {
     if (condition.right_expr->type() == ExprType::FIELD) {
-      auto field_expr      = static_cast<FieldExpr *>(condition.right_expr);
-      condition.right_attr = field_expr->get_sql_node();
+      auto field_expr         = static_cast<FieldExpr *>(condition.right_expr);
+      condition.right_attr    = field_expr->get_sql_node();
       condition.right_is_attr = 1;
     } else if (condition.right_expr->type() == ExprType::VALUE) {
-      auto value_expr      = static_cast<ValueExpr *>(condition.right_expr);
-      condition.right_value = value_expr->get_value();
+      auto value_expr         = static_cast<ValueExpr *>(condition.right_expr);
+      condition.right_value   = value_expr->get_value();
       condition.right_is_attr = 0;
     }
   }
