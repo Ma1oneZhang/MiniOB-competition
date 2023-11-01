@@ -219,7 +219,7 @@ RC SimpleAggregationMap::add(const std::string &key, Value value, AggregationTyp
     } break;
     case AggregationType::MIN: {
       if (value.get_isnull()) {
-        map_[key].second.max_or_min.set_isnull();
+        break;
       }
       if (map_[key].second.max_or_min.get_isnull()) {
         break;
