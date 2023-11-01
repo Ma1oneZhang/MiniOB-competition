@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "common/rc.h"
+#include "sql/parser/lazy_value.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/filter_stmt.h"
 #include "sql/stmt/stmt.h"
@@ -29,8 +30,8 @@ class UpdateStmt : public Stmt
 {
 public:
   // UpdateStmt() = default;
-  UpdateStmt(Table *table, Value *values, FilterStmt *filter, std::vector<std::string> *attribute_names_,
-      int value_amount = 1);
+  UpdateStmt(
+      Table *table, std::vector<LazyValue> &&values, FilterStmt *filter, std::vector<std::string> &&attribute_names_);
   ~UpdateStmt() override = default;
 
   virtual StmtType type() const override { return StmtType::UPDATE; }
@@ -40,17 +41,17 @@ public:
 
 public:
   Table                    *table() const { return table_; }
-  Value                    *values() const { return values_; }
-  Value                    &value_at(size_t i) const { return values_[i]; }
+  std::vector<LazyValue>   *values() { return &values_; }
+  LazyValue                &value_at(size_t i) { return values_[i]; }
   int                       value_amount() const { return value_amount_; }
-  const char               *attribute_name(size_t i) { return attribute_names_->at(i).c_str(); }
-  std::vector<std::string> *attribute_names() { return attribute_names_; }
+  const char               *attribute_name(size_t i) { return attribute_names_.at(i).c_str(); }
+  std::vector<std::string> *attribute_names() { return &attribute_names_; }
   FilterStmt               *filter() const { return filter_; }
 
 private:
-  Table                    *table_           = nullptr;
-  std::vector<std::string> *attribute_names_ = {};
-  FilterStmt               *filter_          = nullptr;
-  Value                    *values_          = nullptr;
-  int                       value_amount_    = 0;
+  Table                   *table_           = nullptr;
+  std::vector<std::string> attribute_names_ = {};
+  FilterStmt              *filter_          = nullptr;
+  std::vector<LazyValue>   values_          = {};
+  int                      value_amount_    = 0;
 };

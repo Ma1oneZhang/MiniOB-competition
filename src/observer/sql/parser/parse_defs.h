@@ -48,12 +48,13 @@ struct OrderBySqlNode
  */
 enum class AggregationType
 {
+  NONE,
   MAX,
   MIN,
   COUNT,
   AVG,
   SUM,
-  NONE
+
 };
 
 /**
@@ -84,10 +85,10 @@ enum CompOp
   GREAT_THAN,   ///< ">"
   LIKE_OP,      ///< "LIKE operation"
   NOT_LIKE_OP,  ///< "NOT LIKE operation"
-  IS_NULL,      ///< is null 
+  IS_NULL,      ///< is null
   IS_NOT_NULL,  ///< is not null
-  IN_OP,           ///< in (sub_query)
-  NOT_IN_OP,       ///< not in (sub_query)
+  IN_OP,        ///< in (sub_query)
+  NOT_IN_OP,    ///< not in (sub_query)
   NO_OP
 };
 
@@ -103,23 +104,23 @@ class ParsedSqlNode;
  */
 struct ConditionSqlNode
 {
-  CompOp         comp;           ///< comparison operator
+  CompOp comp;  ///< comparison operator
 
-  int left_is_attr;              ///< TRUE if left-hand side is an attribute
-                                 ///< 1时，操作符左边是属性名，0时，是属性值
-                                 ///< 0: value, 1: rel_attr, 2: sub_qery, 3: value list
-  Value          left_value;     ///< left-hand side value if left_is_attr = FALSE
-  RelAttrSqlNode left_attr;      ///< left-hand side attribute
-  ParsedSqlNode* left_sub_query;
-  std::vector<Value>  left_value_list;
+  int left_is_attr;               ///< TRUE if left-hand side is an attribute
+                                  ///< 1时，操作符左边是属性名，0时，是属性值
+                                  ///< 0: value, 1: rel_attr, 2: sub_qery, 3: value list
+  Value              left_value;  ///< left-hand side value if left_is_attr = FALSE
+  RelAttrSqlNode     left_attr;   ///< left-hand side attribute
+  ParsedSqlNode     *left_sub_query;
+  std::vector<Value> left_value_list;
 
-  int right_is_attr;  ///< TRUE if right-hand side is an attribute
-                                 ///< 1时，操作符左边是属性名，0时，是属性值
-                                 ///< 0: value, 1: rel_attr, 2: sub_qery
-  RelAttrSqlNode right_attr;     ///< right-hand side attribute if right_is_attr = TRUE 右边的属性
-  Value          right_value;    ///< right-hand side value if right_is_attr = FALSE
-  ParsedSqlNode* right_sub_query;
-  std::vector<Value>  right_value_list;
+  int right_is_attr;               ///< TRUE if right-hand side is an attribute
+                                   ///< 1时，操作符左边是属性名，0时，是属性值
+                                   ///< 0: value, 1: rel_attr, 2: sub_qery
+  RelAttrSqlNode     right_attr;   ///< right-hand side attribute if right_is_attr = TRUE 右边的属性
+  Value              right_value;  ///< right-hand side value if right_is_attr = FALSE
+  ParsedSqlNode     *right_sub_query;
+  std::vector<Value> right_value_list;
 };
 
 /**
@@ -151,6 +152,8 @@ struct SelectSqlNode
   std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>      joinctions;  ///< join 条件
   std::vector<OrderBySqlNode>   orderby;     ///< orderby 条件
+  std::vector<RelAttrSqlNode>   groupby;     ///< groupby 条件
+  std::vector<ConditionSqlNode> having;      ///< having 条件
 };
 
 /**
@@ -186,6 +189,20 @@ struct DeleteSqlNode
 };
 
 /**
+ * @brief 描述一个update语句中的
+ * @ingroup SQLParser
+ */
+// forward declare
+class ParsedSqlNode;
+struct UpdateValue
+{
+  std::string    attribute_name;
+  Value          value;
+  bool           is_stmt = false;
+  ParsedSqlNode *stmt    = nullptr;
+};
+
+/**
  * @brief 描述一个update语句
  * @ingroup SQLParser
  */
@@ -193,18 +210,8 @@ struct UpdateSqlNode
 {
   std::string                   relation_name;   ///< Relation to update
   std::vector<std::string>      attribute_name;  ///< 更新的字段，仅支持一个字段
-  std::vector<Value>            value;           ///< 更新的值，仅支持一个字段
+  std::vector<UpdateValue>      value;           ///< 更新的值，仅支持一个字段
   std::vector<ConditionSqlNode> conditions;
-};
-
-/**
- * @brief 描述一个update语句中的
- * @ingroup SQLParser
- */
-struct UpdateValue
-{
-  std::string attribute_name;
-  Value       value;
 };
 
 /**
@@ -297,8 +304,6 @@ struct SetVariableSqlNode
   std::string name;
   Value       value;
 };
-
-
 
 /**
  * @brief 描述一个explain语句

@@ -59,6 +59,7 @@ RC TableScanPhysicalOperator::open(Trx *trx)
 
 RC TableScanPhysicalOperator::next()
 {
+  
   if (!record_scanner_.has_next()) {
     return RC::RECORD_EOF;
   }

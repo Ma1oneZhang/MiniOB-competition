@@ -12,10 +12,9 @@ See the Mulan PSL v2 for more details. */
 // Created by WangYunlai on 2023/06/28.
 //
 
-#include <sstream>
 #include <cmath>
 #include "sql/parser/value.h"
-#include "storage/field/field.h"
+#include "sql/operator/physical_operator.h"
 #include "common/log/log.h"
 #include "common/lang/comparator.h"
 #include "common/lang/string.h"
@@ -158,18 +157,19 @@ void Value::set_value(const Value &value)
     case UNDEFINED: {
       ASSERT(false, "got an invalid value type");
     } break;
+    case STMT: {
+      // for reduce warning
+    } break;
   }
 }
 
 void Value::set_isnull()
 {
-  isnull_ = true;
+  num_value_.null_value_ = 0x7f7f7f7f;
+  isnull_                = true;
 }
 
-void Value::set_isnotnull()
-{
-  isnull_ = false;
-}
+void Value::set_isnotnull() { isnull_ = false; }
 
 const char *Value::data() const
 {
@@ -188,10 +188,10 @@ std::string Value::to_string() const
   std::string res;
 
   // return null is the value is null
-  if(get_isnull()){
+  if (get_isnull()) {
     return "NULL";
   }
-  
+
   switch (attr_type_) {
     case INTS: {
       res = std::to_string(num_value_.int_value_);
@@ -223,7 +223,7 @@ std::string Value::to_string() const
 int Value::compare(const Value &other) const
 {
   // return false when any value is NULL
-  if(isnull_ & other.get_isnull())
+  if (isnull_ & other.get_isnull())
     return 0;
   else if (isnull_)
     return -1;
@@ -419,10 +419,7 @@ bool Value::get_boolean() const
   return false;
 }
 
-bool Value::get_isnull() const
-{
-  return isnull_; 
-}
+bool Value::get_isnull() const { return isnull_; }
 
 int returnPrefixNum(const char *str, int &val)
 {
@@ -543,4 +540,57 @@ bool Value::match_field_type(AttrType field_type)
 
   // the conversion successed
   return true;
+}
+
+bool Value::check_match_field_type(AttrType lhs, AttrType rhs)
+{
+  if (lhs == rhs) {
+    return true;
+  }
+  switch (lhs) {
+    case CHARS: {
+      switch (rhs) {
+        case INTS: {
+          return true;
+        } break;
+        case FLOATS: {
+          return true;
+        } break;
+        default: {
+          return false;
+        } break;
+      }
+      return false;
+    } break;
+    case INTS: {
+      switch (rhs) {
+        case CHARS: {
+          return true;
+        } break;
+        case FLOATS: {
+          return true;
+        } break;
+        default: {
+          return false;
+        } break;
+      }
+      return false;
+    } break;
+    case FLOATS: {
+      switch (rhs) {
+        case CHARS: {
+          return true;
+        } break;
+        case INTS: {
+          return true;
+        } break;
+        default: {
+          return false;
+        } break;
+      }
+    } break;
+    default: {
+      return false;
+    } break;
+  }
 }

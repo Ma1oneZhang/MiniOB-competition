@@ -95,24 +95,40 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   if (condition.left_is_attr == 1) {
     Table           *table = nullptr;
     const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
+    FilterObj        filter_obj;
+    if (condition.left_attr.aggregation_type == AggregationType::COUNT && condition.left_attr.attribute_name == "*") {
+      filter_obj.init_attr(Field(default_table, nullptr, condition.left_attr.aggregation_type));
+      filter_unit->set_left(filter_obj);
+    } else {
+      rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot find attr");
+        return rc;
+      }
+      if ((comp == LIKE_OP || comp == NOT_LIKE_OP) && field->type() != AttrType::CHARS) {
+        return RC::INVALID_ARGUMENT;
+      }
+      if (field->type() == AttrType::DATES &&
+          (condition.comp != CompOp::IS_NOT_NULL && condition.comp != CompOp::IS_NULL)) {
+        auto value = condition.right_value;
+        if (!value.get_isnull()) {
+          auto status = value.match_field_type(AttrType::DATES);
+          if (!status) {
+            return RC::INVALID_ARGUMENT;
+          }
+        }
+      }
+      filter_obj.init_attr(Field(table, field, condition.left_attr.aggregation_type));
+      filter_unit->set_left(filter_obj);
     }
-    if ((comp == LIKE_OP || comp == NOT_LIKE_OP) && field->type() != AttrType::CHARS) {
-      return RC::INVALID_ARGUMENT;
-    }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_left(filter_obj);
+
   } else if (condition.left_is_attr == 0) {
     FilterObj filter_obj;
     filter_obj.init_value(condition.left_value);
     filter_unit->set_left(filter_obj);
   } else if (condition.left_is_attr == 2) {
     Stmt *stmt = nullptr;
-    rc = Stmt::create_stmt(db, *condition.left_sub_query, stmt); 
+    rc         = Stmt::create_stmt(db, *condition.left_sub_query, stmt);
 
     FilterObj filter_obj;
     filter_obj.init_stmt(stmt);
@@ -126,14 +142,20 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   if (condition.right_is_attr == 1) {  // the right is attr
     Table           *table = nullptr;
     const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
+    if (condition.right_attr.aggregation_type == AggregationType::COUNT && condition.right_attr.attribute_name == "*") {
+      FilterObj filter_obj;
+      filter_obj.init_attr(Field(default_table, nullptr, condition.left_attr.aggregation_type));
+      filter_unit->set_right(filter_obj);
+    } else {
+      rc = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("cannot find attr");
+        return rc;
+      }
+      FilterObj filter_obj;
+      filter_obj.init_attr(Field(table, field));
+      filter_unit->set_right(filter_obj);
     }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_right(filter_obj);
   } else if (condition.right_is_attr == 0) {  // the right is value
     FilterObj filter_obj;
     filter_obj.init_value(condition.right_value);

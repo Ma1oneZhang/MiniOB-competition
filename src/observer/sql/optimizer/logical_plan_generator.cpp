@@ -29,6 +29,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/update_logical_operator.h"
 
 #include "sql/parser/parse_defs.h"
+#include "sql/parser/value.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/select_stmt.h"
@@ -91,38 +92,47 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 {
   unique_ptr<LogicalOperator> table_oper(nullptr);
   unique_ptr<LogicalOperator> aggregation_oper(nullptr);
+  unique_ptr<LogicalOperator> having_oper(nullptr);
 
   const std::vector<Table *> &tables     = select_stmt->tables();
   const std::vector<Field>   &all_fields = select_stmt->query_fields();
 
+  std::vector<Field> fields;
+  std::vector<Field> group_by;
+  bool               aggr = false;
   for (Table *table : tables) {
-    std::vector<Field> fields;
     for (const Field &field : all_fields) {
-      if (field.get_aggr_type() == AggregationType::COUNT) {
+      if (field.get_aggr_type() != AggregationType::NONE) {
+        aggr = true;
+      }
+      // count(*)
+      if (field.get_aggr_type() == AggregationType::COUNT && field.table() == nullptr) {
         fields.push_back(field);
       } else if (0 == strcmp(field.table_name(), table->name())) {
         fields.push_back(field);
       }
     }
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, true /*readonly*/));
-    if (all_fields[0].get_aggr_type() == AggregationType::NONE) {
-      // plain
-      if (table_oper == nullptr) {
-        table_oper = std::move(table_get_oper);
-      } else {
-        JoinLogicalOperator *join_oper = new JoinLogicalOperator;
-        join_oper->add_child(std::move(table_oper));
-        join_oper->add_child(std::move(table_get_oper));
-        table_oper = unique_ptr<LogicalOperator>(join_oper);
+    for (const Field &field : all_fields) {
+      if (0 == strcmp(field.table_name(), table->name()) && field.get_aggr_type() == AggregationType::NONE) {
+        group_by.push_back(field);
       }
-    } else {
-      // aggr func
-      if (table_oper == nullptr) {
-        table_oper = std::move(table_get_oper);
-      }
-      unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(table, fields));
-      aggregation_oper.swap(aggr_oper);
     }
+    if (table_oper == nullptr) {
+      table_oper = std::move(table_get_oper);
+    } else {
+      JoinLogicalOperator *join_oper = new JoinLogicalOperator;
+      join_oper->add_child(std::move(table_oper));
+      join_oper->add_child(std::move(table_get_oper));
+      table_oper = unique_ptr<LogicalOperator>(join_oper);
+    }
+  }
+
+  if (aggr) {
+    auto fields_ = fields;
+    fields_.insert(fields_.begin(), select_stmt->having().begin(), select_stmt->having().end());
+    unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(fields_, group_by));
+    aggregation_oper.swap(aggr_oper);
   }
 
   unique_ptr<LogicalOperator> predicate_oper;
@@ -136,6 +146,14 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   if (select_stmt->order_by_stmt()) {
     order_by_oper = make_unique<OrderByLogicalOperator>(select_stmt->order_by_stmt()->get_order_by_units());
   }
+  // if having not nullptr
+  if (select_stmt->having_stmt()) {
+    rc = create_plan(select_stmt->having_stmt(), having_oper);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create having logical plan. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
   unique_ptr<LogicalOperator> project_oper(new ProjectLogicalOperator(all_fields));
   if (aggregation_oper) {
     if (predicate_oper) {
@@ -144,10 +162,20 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
         predicate_oper->add_child(std::move(table_oper));
       }
       aggregation_oper->add_child(std::move(predicate_oper));
-      project_oper->add_child(std::move(aggregation_oper));
+      if (having_oper) {
+        having_oper->add_child(std::move(aggregation_oper));
+        project_oper->add_child(std::move(having_oper));
+      } else {
+        project_oper->add_child(std::move(aggregation_oper));
+      }
     } else {
       aggregation_oper->add_child(std::move(table_oper));
-      project_oper->add_child(std::move(aggregation_oper));
+      if (having_oper) {
+        having_oper->add_child(std::move(aggregation_oper));
+        project_oper->add_child(std::move(having_oper));
+      } else {
+        project_oper->add_child(std::move(aggregation_oper));
+      }
     }
   } else if (order_by_oper) {
     if (predicate_oper) {
@@ -194,28 +222,32 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     //                                  : static_cast<Expression *>(new ValueExpr(filter_obj_right.value)));
 
     // filter_obj_left could be value, attr and sub_query
-    unique_ptr<Expression> left;
+    unique_ptr<Expression>      left;
     unique_ptr<LogicalOperator> left_sub_query_oper(nullptr);
     switch (filter_obj_left.is_attr) {
       case 0: left.reset(static_cast<Expression *>(new ValueExpr(filter_obj_left.value))); break;
       case 1: left.reset(static_cast<Expression *>(new FieldExpr(filter_obj_left.field))); break;
-      case 2: 
-      {
-        switch(filter_obj_left.sub_query->type()){
+      case 2: {
+        switch (filter_obj_left.sub_query->type()) {
           case StmtType::CALC:
-            create_plan(dynamic_cast<CalcStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
+            create_plan(dynamic_cast<CalcStmt *>(filter_obj_left.sub_query), left_sub_query_oper);
+            break;
           case StmtType::SELECT:
-            create_plan(dynamic_cast<SelectStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
+            create_plan(dynamic_cast<SelectStmt *>(filter_obj_left.sub_query), left_sub_query_oper);
+            break;
           // case StmtType::PREDICATE:
           //   create_plan(dynamic_cast<FilterStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
           case StmtType::INSERT:
-            create_plan(dynamic_cast<InsertStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
+            create_plan(dynamic_cast<InsertStmt *>(filter_obj_left.sub_query), left_sub_query_oper);
+            break;
           case StmtType::DELETE:
-            create_plan(dynamic_cast<DeleteStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break;
+            create_plan(dynamic_cast<DeleteStmt *>(filter_obj_left.sub_query), left_sub_query_oper);
+            break;
           case StmtType::UPDATE:
-            create_plan(dynamic_cast<UpdateStmt *>(filter_obj_left.sub_query), left_sub_query_oper); break; 
+            create_plan(dynamic_cast<UpdateStmt *>(filter_obj_left.sub_query), left_sub_query_oper);
+            break;
         }
-        // OperExpr* sub_query_oper = new OperExpr(sub_query_oper); 
+        // OperExpr* sub_query_oper = new OperExpr(sub_query_oper);
         left.reset(static_cast<Expression *>(new OperExpr(left_sub_query_oper)));
       } break;
       case 3: left.reset(static_cast<Expression *>(new ValueListExpr(filter_obj_left.value_list))); break;
@@ -223,28 +255,32 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     }
 
     // filter_obj_right could be value, attr and sub_query
-    unique_ptr<Expression> right;
+    unique_ptr<Expression>      right;
     unique_ptr<LogicalOperator> right_sub_query_oper(nullptr);
     switch (filter_obj_right.is_attr) {
       case 0: right.reset(static_cast<Expression *>(new ValueExpr(filter_obj_right.value))); break;
       case 1: right.reset(static_cast<Expression *>(new FieldExpr(filter_obj_right.field))); break;
-      case 2: 
-      {
-        switch(filter_obj_right.sub_query->type()){
+      case 2: {
+        switch (filter_obj_right.sub_query->type()) {
           case StmtType::CALC:
-            create_plan(dynamic_cast<CalcStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
+            create_plan(dynamic_cast<CalcStmt *>(filter_obj_right.sub_query), right_sub_query_oper);
+            break;
           case StmtType::SELECT:
-            create_plan(dynamic_cast<SelectStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
+            create_plan(dynamic_cast<SelectStmt *>(filter_obj_right.sub_query), right_sub_query_oper);
+            break;
           // case StmtType::PREDICATE:
           //   create_plan(dynamic_cast<FilterStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
           case StmtType::INSERT:
-            create_plan(dynamic_cast<InsertStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
+            create_plan(dynamic_cast<InsertStmt *>(filter_obj_right.sub_query), right_sub_query_oper);
+            break;
           case StmtType::DELETE:
-            create_plan(dynamic_cast<DeleteStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break;
+            create_plan(dynamic_cast<DeleteStmt *>(filter_obj_right.sub_query), right_sub_query_oper);
+            break;
           case StmtType::UPDATE:
-            create_plan(dynamic_cast<UpdateStmt *>(filter_obj_right.sub_query), right_sub_query_oper); break; 
+            create_plan(dynamic_cast<UpdateStmt *>(filter_obj_right.sub_query), right_sub_query_oper);
+            break;
         }
-        // OperExpr* sub_query_oper = new OperExpr(sub_query_oper); 
+        // OperExpr* sub_query_oper = new OperExpr(sub_query_oper);
         right.reset(static_cast<Expression *>(new OperExpr(right_sub_query_oper)));
       } break;
       case 3: right.reset(static_cast<Expression *>(new ValueListExpr(filter_obj_right.value_list))); break;
@@ -332,6 +368,11 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
     const FieldMeta *field_meta = table->table_meta().field(i);
     fields.push_back(Field(table, field_meta));
   }
+  for (LazyValue &value : *value) {
+    if (value.get_select_stmt() != nullptr) {
+      create(value.get_select_stmt(), value.get_logical_operator());
+    }
+  }
   unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, false /*readonly*/));
 
   unique_ptr<LogicalOperator> predicate_oper;
@@ -342,8 +383,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
     return rc;
   }
 
-  unique_ptr<LogicalOperator> update_oper(
-      new UpdateLogicalOperator(table, attr_name, update_stmt->values(), update_stmt->value_amount()));
+  unique_ptr<LogicalOperator> update_oper(new UpdateLogicalOperator(table, std::move(*attr_name), std::move(*value)));
   if (predicate_oper) {
     predicate_oper->add_child(std::move(table_get_oper));
     update_oper->add_child(std::move(predicate_oper));

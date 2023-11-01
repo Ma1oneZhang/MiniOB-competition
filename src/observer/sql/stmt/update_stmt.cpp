@@ -17,14 +17,18 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
 #include "sql/stmt/filter_stmt.h"
+#include "sql/stmt/select_stmt.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include <vector>
 
 UpdateStmt::UpdateStmt(
-    Table *table, Value *values, FilterStmt *filter, std::vector<std::string> *attribute_names, int value_amount)
-    : table_(table), values_(values), value_amount_(value_amount), filter_(filter), attribute_names_(attribute_names)
-{}
+    Table *table, std::vector<LazyValue> &&values, FilterStmt *filter, std::vector<std::string> &&attribute_names)
+    : table_(table), filter_(filter), attribute_names_(attribute_names)
+{
+  values_.swap(values);
+  value_amount_ = values_.size();
+}
 
 RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
 {
@@ -32,19 +36,48 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   if (table == nullptr) {
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
-  auto fields = table->table_meta().field_metas();
+  auto                     fields = table->table_meta().field_metas();
+  std::vector<LazyValue>   values;
+  std::vector<std::string> field_names;
   for (size_t i = 0; i < update.attribute_name.size(); i++) {
     auto &field = update.attribute_name[i];
     auto &value = update.value[i];
     bool  match = false;
     for (auto iter = fields->begin(); iter != fields->end(); iter++) {
       if (field == iter->name()) {
-        if(value.get_isnull()) {
+        if (value.is_stmt) {
           match = true;
+          if (value.stmt->flag != SCF_SELECT) {
+            return RC::INVALID_ARGUMENT;
+          }
+          Stmt *stmt = nullptr;
+          auto  rc   = Stmt::create_stmt(db, *value.stmt, stmt);
+          if (rc != RC::SUCCESS) {
+            stmt = nullptr;
+            return rc;
+          }
+          // check if return multi-field
+          auto        select_stmt  = static_cast<SelectStmt *>(stmt);
+          const auto &query_fields = select_stmt->query_fields();
+          if (query_fields.size() != 1) {
+            LOG_WARN("query return more than one field");
+            return RC::MULTI_COL_RETURN;
+          }
+          // check the query field is matchi
+          const auto &field = query_fields.front();
+          if (!Value::check_match_field_type(field.attr_type(), iter->type())) {
+            return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+          }
+          values.push_back(select_stmt);
+        } else if (value.value.get_isnull()) {
+          match  = true;
+          auto i = value.value;
+          values.emplace_back(i);
           break;
-        }
-        if (iter->type() == value.attr_type()) {
+        } else if (Value::check_match_field_type(value.value.attr_type(), iter->type())) {
           // we only need match one of field
+          auto i = value.value;
+          values.emplace_back(i);
           match = true;
           break;
         } else {
@@ -55,6 +88,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     if (!match) {
       return RC::SCHEMA_FIELD_MISSING;
     }
+    field_names.push_back(update.attribute_name[i]);
   }
   FilterStmt *filter = nullptr;
   if (update.conditions.size() != 0) {
@@ -63,10 +97,6 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
       return rc;
     }
   }
-  stmt = new UpdateStmt(table,
-      const_cast<Value *>(update.value.data()),
-      filter,
-      const_cast<std::vector<std::string> *>(&update.attribute_name),
-      update.value.size());
+  stmt = new UpdateStmt(table, std::move(values), filter, std::move(field_names));
   return RC::SUCCESS;
 }

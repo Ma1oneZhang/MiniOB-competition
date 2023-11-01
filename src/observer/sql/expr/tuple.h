@@ -149,12 +149,12 @@ public:
     const FieldMeta *field_meta = field_expr.field().meta();
 
     // restore null value
-    if(field_meta->nullable()){
-      int null_bitmap_offset = table_->table_meta().null_bitmap_offset();
-      int null_bitmap_size = table_->table_meta().null_bitmap_size();
-      char bitmap = *(this->record_.data() + null_bitmap_offset + null_bitmap_size - 1 - index/8);
-      bool null = (bitmap & (1 << (index%8))) != 0;
-      if(null){
+    if (field_meta->nullable()) {
+      int  null_bitmap_offset = table_->table_meta().null_bitmap_offset();
+      int  null_bitmap_size   = table_->table_meta().null_bitmap_size();
+      char bitmap             = *(this->record_.data() + null_bitmap_offset + null_bitmap_size - 1 - index / 8);
+      bool null               = (bitmap & (1 << (index % 8))) != 0;
+      if (null) {
         cell.set_isnull();
       }
     }
@@ -390,12 +390,14 @@ public:
     return RC::SUCCESS;
   }
 
-  void add_cell_spec(const char *spec) { names_.push_back(spec); }
+  void add_cell_spec(TupleCellSpec spec) { names_.push_back(spec); }
 
   virtual RC find_cell(const TupleCellSpec &spec, Value &cell) const override
   {
     for (size_t i = 0; i < names_.size(); i++) {
-      if (names_[i] == std::string(spec.alias())) {
+      if (names_[i].alias() == std::string(spec.alias()) ||
+          (names_[i].field_name() == std::string(spec.field_name()) &&
+              names_[i].table_name() == std::string(spec.table_name()))) {
         cell = cells_[i];
         return RC::SUCCESS;
       }
@@ -404,6 +406,6 @@ public:
   }
 
 private:
-  std::vector<std::string> names_;
-  std::vector<Value>       cells_;
+  std::vector<TupleCellSpec> names_;
+  std::vector<Value>         cells_;
 };
