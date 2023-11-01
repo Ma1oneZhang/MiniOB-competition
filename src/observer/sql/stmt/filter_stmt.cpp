@@ -36,6 +36,10 @@ RC FilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::stri
   stmt  = nullptr;
 
   FilterStmt *tmp_stmt = new FilterStmt();
+  if(condition_num > 0){
+    tmp_stmt->link_type_ = conditions[0].link_type;
+  }
+
   for (int i = 0; i < condition_num; i++) {
     FilterUnit *filter_unit = nullptr;
     rc                      = create_filter_unit(db, default_table, tables, conditions[i], filter_unit);

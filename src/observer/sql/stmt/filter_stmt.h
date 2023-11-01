@@ -122,6 +122,9 @@ public:
   static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
       const ConditionSqlNode &condition, FilterUnit *&filter_unit);
 
+  int get_link_type() { return link_type_; }
+
 private:
-  std::vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系
+  std::vector<FilterUnit *> filter_units_;
+  int                       link_type_ = 0;  // 0: AND, 1: OR 
 };

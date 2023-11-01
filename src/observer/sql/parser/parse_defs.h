@@ -120,6 +120,8 @@ struct ConditionSqlNode
   Value              right_value;  ///< right-hand side value if right_is_attr = FALSE
   ParsedSqlNode     *right_sub_query;
   std::vector<Value> right_value_list;
+
+  int                link_type = 0;  ///< 该条件跟其他条件的链接方式， 0 (default)：AND连接， 1：OR连接     
 };
 
 /**
