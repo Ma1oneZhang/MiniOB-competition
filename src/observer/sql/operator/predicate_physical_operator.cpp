@@ -38,7 +38,7 @@ RC PredicatePhysicalOperator::open(Trx *trx)
         ComparisonExpr *comp_expr = static_cast<ComparisonExpr *>(child_exprs[i].get());
         if (comp_expr->left()->type() == ExprType::SUB_QUERY) {  // this expre contain sub-query
           // restore physocal operator
-          OperExpr                    *oper_expr  = static_cast<OperExpr *>((comp_expr->left()).get());
+          OperExpr                     *oper_expr   = static_cast<OperExpr *>((comp_expr->left()).get());
           unique_ptr<PhysicalOperator> &physic_oper = oper_expr->get_physic_oper();
 
           // open
@@ -48,7 +48,7 @@ RC PredicatePhysicalOperator::open(Trx *trx)
         }
         if (comp_expr->right()->type() == ExprType::SUB_QUERY) {  // this expre contain sub-query
           // restore physocal operator
-          OperExpr                    *oper_expr  = static_cast<OperExpr *>((comp_expr->right()).get());
+          OperExpr                     *oper_expr   = static_cast<OperExpr *>((comp_expr->right()).get());
           unique_ptr<PhysicalOperator> &physic_oper = oper_expr->get_physic_oper();
 
           // open
@@ -63,7 +63,7 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     ComparisonExpr *comp_expr = static_cast<ComparisonExpr *>(expression_.get());
     if (comp_expr->left()->type() == ExprType::SUB_QUERY) {  // this expre contain sub-query
       // restore physocal operator
-      OperExpr                    *oper_expr  = static_cast<OperExpr *>((comp_expr->left()).get());
+      OperExpr                     *oper_expr   = static_cast<OperExpr *>((comp_expr->left()).get());
       unique_ptr<PhysicalOperator> &physic_oper = oper_expr->get_physic_oper();
 
       // open
@@ -73,7 +73,7 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     }
     if (comp_expr->right()->type() == ExprType::SUB_QUERY) {  // this expre contain sub-query
       // restore physocal operator
-      OperExpr                    *oper_expr  = static_cast<OperExpr *>((comp_expr->right()).get());
+      OperExpr                     *oper_expr   = static_cast<OperExpr *>((comp_expr->right()).get());
       unique_ptr<PhysicalOperator> &physic_oper = oper_expr->get_physic_oper();
 
       // open
@@ -93,7 +93,7 @@ RC PredicatePhysicalOperator::open(Trx *trx)
 
 RC PredicatePhysicalOperator::next()
 {
-  RC rc = RC::SUCCESS;
+  RC                rc   = RC::SUCCESS;
   PhysicalOperator *oper = children_.front().get();
 
   oper->set_parent_query_tuples(get_parent_query_tuples());
@@ -107,9 +107,13 @@ RC PredicatePhysicalOperator::next()
 
     // append current tuple into parent query tuples
     std::unordered_map<std::string, Tuple *> parent_query_tuples = get_parent_query_tuples();
-    std::string table_name = dynamic_cast<RowTuple *>(tuple)->get_table_name();
-    parent_query_tuples[table_name] = tuple;
-    expression_->set_parent_query_tuples(parent_query_tuples);
+
+    auto table_tuple = dynamic_cast<RowTuple *>(tuple);
+    if (table_tuple) {
+      std::string table_name          = table_tuple->get_table_name();
+      parent_query_tuples[table_name] = table_tuple;
+      expression_->set_parent_query_tuples(parent_query_tuples);
+    }
 
     Value value;
     rc = expression_->get_value(*tuple, value);
@@ -130,7 +134,4 @@ RC PredicatePhysicalOperator::close()
   return RC::SUCCESS;
 }
 
-Tuple *PredicatePhysicalOperator::current_tuple()
-{
-  return children_[0]->current_tuple();
-}
+Tuple *PredicatePhysicalOperator::current_tuple() { return children_[0]->current_tuple(); }
