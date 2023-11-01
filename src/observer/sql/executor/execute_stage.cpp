@@ -70,10 +70,10 @@ RC ExecuteStage::handle_request_with_physical_operator(SQLStageEvent *sql_event)
       bool        with_table_name = select_stmt->tables().size() > 1;
 
       for (const Field &field : select_stmt->query_fields()) {
-        if (with_table_name) {
-          schema.append_cell(field.table_name(), field.field_name());
-        } else if (field.is_expr()) {
+        if (field.is_expr()) {
           schema.append_cell(field.expr());
+        } else if (with_table_name) {
+          schema.append_cell(field.table_name(), field.field_name());
         } else {
           schema.append_cell(field.field_name());
         }
