@@ -47,6 +47,21 @@ RC DeleteStmt::create(Db *db, const DeleteSqlNode &delete_sql, Stmt *&stmt)
   std::unordered_map<std::string, Table *> table_map;
   table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
 
+  std::vector<Table *> tables = {table};
+  for (auto &i : delete_sql.conditions) {
+    if (i.left_is_attr == 4) {
+      auto rc = i.left_expr->set_table_name(tables);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+    }
+    if (i.right_is_attr == 4) {
+      auto rc = i.right_expr->set_table_name(tables);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+    }
+  }
   FilterStmt *filter_stmt = nullptr;
   RC rc = FilterStmt::create(
       db, table, &table_map, delete_sql.conditions.data(), static_cast<int>(delete_sql.conditions.size()), filter_stmt);

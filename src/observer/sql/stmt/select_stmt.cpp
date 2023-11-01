@@ -269,6 +269,12 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     }
     return RC::SUCCESS;
   };
+  for (auto expr : select_sql.attributes) {
+    auto rc = expr->set_table_name(tables);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+  }
   for (int i = static_cast<int>(select_sql.attributes.size()) - 1; i >= 0; i--) {
     if (select_sql.attributes[i]->type() == ExprType::FIELD) {
       auto field_expr = static_cast<FieldExpr *>(select_sql.attributes[i]);
@@ -288,9 +294,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       query_fields.emplace_back(select_sql.attributes[i]);
     }
   }
-  for (auto expr : select_sql.attributes) {
-    expr->set_table_name(tables);
-  }
+
   // append tables in parent query
   for (const auto &pair : select_sql.parent_query_tables) {
     if (table_map.count(pair.first) == 0) {
