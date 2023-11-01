@@ -211,7 +211,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   std::vector<unique_ptr<Expression>> cmp_exprs;
   ConjunctionExpr::Type               link_type =
       filter_stmt->get_link_type() == 0 ? ConjunctionExpr::Type::AND : ConjunctionExpr::Type::OR;
-  const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
+  const std::vector<FilterUnit *> &filter_units = filter_stmt->filter_units();
   for (const FilterUnit *filter_unit : filter_units) {
     const FilterObj &filter_obj_left  = filter_unit->left();
     const FilterObj &filter_obj_right = filter_unit->right();
@@ -253,6 +253,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         left.reset(static_cast<Expression *>(new OperExpr(left_sub_query_oper)));
       } break;
       case 3: left.reset(static_cast<Expression *>(new ValueListExpr(filter_obj_left.value_list))); break;
+      case 4: left.reset(filter_obj_left.expr_);
       default: break;
     }
 
@@ -286,6 +287,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         right.reset(static_cast<Expression *>(new OperExpr(right_sub_query_oper)));
       } break;
       case 3: right.reset(static_cast<Expression *>(new ValueListExpr(filter_obj_right.value_list))); break;
+      case 4: right.reset(filter_obj_right.expr_);
       default: break;
     }
 

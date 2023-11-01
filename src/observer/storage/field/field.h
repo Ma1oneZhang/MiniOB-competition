@@ -61,7 +61,7 @@ public:
     }
   }
   Field(const Field &) = default;
-
+  Field(Expression *expr) : expr_(expr) {}
   const Table     *table() const { return table_; }
   const FieldMeta *meta() const { return field_; }
 
@@ -70,7 +70,8 @@ public:
   const char *table_name() const { return table_->name(); }
   const char *field_name() const
   {
-    return (AggregationType::NONE == aggregation_ && aggr_field_name_ != "COUNT(*)") ? field_->name() : aggr_field_name_.c_str();
+    return (AggregationType::NONE == aggregation_ && aggr_field_name_ != "COUNT(*)") ? field_->name()
+                                                                                     : aggr_field_name_.c_str();
   }
 
   void set_table(const Table *table) { this->table_ = table; }
@@ -83,9 +84,13 @@ public:
 
   const char *get_data(const Record &record);
 
+  bool        is_expr() const { return expr_ != nullptr; }
+  Expression *expr() const { return expr_; }
+
 private:
   const Table     *table_ = nullptr;
   const FieldMeta *field_ = nullptr;
   std::string      aggr_field_name_;
   AggregationType  aggregation_ = AggregationType::NONE;
+  Expression      *expr_        = nullptr;
 };

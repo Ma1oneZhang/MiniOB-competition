@@ -163,17 +163,15 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <rel_attr>            rel_attr
 %type <update_value>        update_attr
 %type <update_value_list>   update_attr_list
-%type <rel_attr>            aggr_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <value_list>          value_list
 %type <tuple_list>          tuple_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
-%type <rel_attr_list>       select_attr
 %type <relation_list>       rel_list
-%type <rel_attr_list>       attr_list
-%type <rel_attr_list>       group_by
+%type <expression_list>     attr_list
+%type <expression_list>       group_by
 %type <condition_list>      having
 %type <condition_list>      having_list
 %type <condition>           having_attr
@@ -619,7 +617,7 @@ update_attr_list:
       $$->push_back(*$2);
     };
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list join_list where order_by group_by having
+    SELECT expression_list FROM ID rel_list join_list where order_by group_by having
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -703,27 +701,10 @@ expression:
       $$ = new ValueExpr(*$1);
       $$->set_name(token_name(sql_string, &@$));
       delete $1;
-    }
-    ;
-
-select_attr:
-    rel_attr attr_list {
-      if ($2 != nullptr) {
-        $$ = $2;
-      } else {
-        $$ = new std::vector<RelAttrSqlNode>;
-      }
-      $$->emplace_back(*$1);
-      delete $1;
-    }
-    | aggr_attr attr_list {
-      if ($2 != nullptr) {
-        $$ = $2;
-      } else {
-        $$ = new std::vector<RelAttrSqlNode>;
-      }
-      $$->emplace_back(*$1);
-      delete $1;
+    } 
+    | rel_attr {
+      $$ = new FieldExpr(*$1);
+      delete $1; 
     }
     ;
 
@@ -745,53 +726,7 @@ rel_attr:
       free($1);
       free($3);
     }
-    ;
-
-attr_list:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | COMMA rel_attr attr_list {
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new std::vector<RelAttrSqlNode>;
-      }
-
-      $$->emplace_back(*$2);
-      delete $2;
-    }
-    | COMMA aggr_attr attr_list {
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new std::vector<RelAttrSqlNode>;
-      }
-      $$->emplace_back(*$2);
-      delete $2;
-    }
-    ;
-
-rel_list:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | COMMA ID rel_list {
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new std::vector<std::string>;
-      }
-
-      $$->push_back($2);
-      free($2);
-    }
-    ;
-
-aggr_attr:
-    MIN LBRACE rel_attr RBRACE
+    | MIN LBRACE rel_attr RBRACE
     {
       $$ = $3;
       $$->aggregation_type = AggregationType::MIN;
@@ -816,21 +751,54 @@ aggr_attr:
       $$ = $3;
       $$->aggregation_type = AggregationType::SUM;
     }
+    ;
+
+attr_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA expression attr_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<Expression *>;
+      }
+      $$->emplace_back($2);
+    }
+    ;
+
+rel_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | COMMA ID rel_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::string>;
+      }
+
+      $$->push_back($2);
+      free($2);
+    }
+    ;
+
 
 group_by:
     /* empty */
     {
       $$ = nullptr;
     }
-    | GROUP BY rel_attr attr_list
+    | GROUP BY expression attr_list
     {
       if($4 != nullptr){
         $$ = $4;
       } else {
-        $$ = new std::vector<RelAttrSqlNode>;
+        $$ = new std::vector<Expression *>;
       }
-      $$->emplace_back(*$3);
-      delete $3;
+      $$->emplace_back($3);
     };
     
 having:
@@ -867,7 +835,7 @@ having_list:
     ;
 
 having_attr:
-    aggr_attr comp_op value
+    rel_attr comp_op value
     {
       $$ = new ConditionSqlNode;
       $$->left_is_attr = 1;
@@ -996,100 +964,45 @@ condition_list:
     }
     ;
 condition:
-    rel_attr comp_op value
+    expression comp_op expression
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
+      $$->left_is_attr = 4;
+      $$->left_expr = $1;
+      $$->right_is_attr = 4;
+      $$->right_expr = $3;
       $$->comp = $2;
-
-      delete $1;
-      delete $3;
     }
-    | value comp_op value 
+    | expression LIKE expression
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr LIKE value
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
+      $$->left_is_attr = 4;
+      $$->left_expr = $1;
+      $$->right_is_attr = 4;
+      $$->right_expr = $3;
       $$->comp = CompOp::LIKE_OP;
     }
-    | rel_attr NOT LIKE value
+    | expression NOT LIKE expression
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$4;
+      $$->left_is_attr = 4;
+      $$->left_expr = $1;
+      $$->right_is_attr = 4;
+      $$->right_expr = $4;
       $$->comp = CompOp::NOT_LIKE_OP;
     }
-    | rel_attr IS NULL_TOKEN
+    | expression IS NULL_TOKEN
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
+      $$->left_is_attr = 4;
+      $$->left_expr = $1;
       $$->comp = CompOp::IS_NULL;
     }
-    | rel_attr IS NOT NULL_TOKEN
+    | expression IS NOT NULL_TOKEN
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->comp = CompOp::IS_NOT_NULL;
-    }
-    | value IS NULL_TOKEN
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->right_is_attr = 0;
-      $$->left_value = *$1;
-      $$->comp = CompOp::IS_NULL;
-    }
-    | value IS NOT NULL_TOKEN
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->right_is_attr = 0;
-      $$->left_value = *$1;
+      $$->left_is_attr = 4;
+      $$->left_expr = $1;
       $$->comp = CompOp::IS_NOT_NULL;
     }
     | LBRACE select_stmt RBRACE comp_op LBRACE select_stmt RBRACE
@@ -1101,38 +1014,32 @@ condition:
       $$->right_sub_query = $6;
       $$->comp = $4;
     }
-    | rel_attr comp_op LBRACE select_stmt RBRACE
+    | expression comp_op LBRACE select_stmt RBRACE
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
+      $$->left_is_attr = 4;
+      $$->left_expr = $1;
       $$->right_is_attr = 2;
       $$->right_sub_query = $4;
       $$->comp = $2;
-
-      delete $1;
     }
-    | LBRACE select_stmt RBRACE comp_op rel_attr
+    | LBRACE select_stmt RBRACE comp_op expression
     {
       $$ = new ConditionSqlNode;
       $$->left_is_attr = 2;
       $$->left_sub_query = $2;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$5;
+      $$->right_is_attr = 4;
+      $$->right_expr = $5;
       $$->comp = $4;
-
-      delete $5;
     }
-    | rel_attr comp_op tuple
+    | expression comp_op tuple
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
+      $$->left_is_attr = 4;
+      $$->left_expr = $1;
       $$->right_is_attr = 3;
       $$->right_value_list = *$3;
       $$->comp = $2;
-
-      delete $1;
     }
     ;
 

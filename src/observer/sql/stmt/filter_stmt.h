@@ -25,76 +25,62 @@ class Db;
 class Table;
 class FieldMeta;
 
-struct FilterObj 
+struct FilterObj
 {
-  int is_attr;  // 0: value, 1: attr, 2: sub_query, 3: value list
-  Field field;
-  Value value;
-  Stmt *sub_query;
+  int           is_attr;  // 0: value, 1: attr, 2: sub_query, 3: value list 4: expression
+  Field         field;
+  Value         value;
+  Stmt         *sub_query;
   vector<Value> value_list;
-
-  void init_attr(const Field &field)
+  Expression   *expr_ = nullptr;
+  void          init_attr(const Field &field)
   {
-    is_attr = 1;
+    is_attr     = 1;
     this->field = field;
   }
 
   void init_value(const Value &value)
   {
-    is_attr = 0;
+    is_attr     = 0;
     this->value = value;
   }
 
-  void init_stmt(Stmt* stmt)
+  void init_stmt(Stmt *stmt)
   {
-    is_attr = 2;
+    is_attr         = 2;
     this->sub_query = stmt;
   }
 
   void init_valuelist(vector<Value> vl)
   {
-    is_attr = 3;
+    is_attr          = 3;
     this->value_list = vl;
+  }
+  void init_expr(Expression *expr)
+  {
+    is_attr = 4;
+    expr_   = expr;
   }
 };
 
-class  FilterUnit 
+class FilterUnit
 {
 public:
   FilterUnit() = default;
-  ~FilterUnit()
-  {}
+  ~FilterUnit() {}
 
-  void set_comp(CompOp comp)
-  {
-    comp_ = comp;
-  }
+  void set_comp(CompOp comp) { comp_ = comp; }
 
-  CompOp comp() const
-  {
-    return comp_;
-  }
+  CompOp comp() const { return comp_; }
 
-  void set_left(const FilterObj &obj)
-  {
-    left_ = obj;
-  }
-  void set_right(const FilterObj &obj)
-  {
-    right_ = obj;
-  }
+  void set_left(const FilterObj &obj) { left_ = obj; }
+  void set_right(const FilterObj &obj) { right_ = obj; }
 
-  const FilterObj &left() const
-  {
-    return left_;
-  }
-  const FilterObj &right() const
-  {
-    return right_;
-  }
+  const FilterObj &left() const { return left_; }
+  const FilterObj &right() const { return right_; }
 
 private:
-  CompOp comp_ = NO_OP;
+  CompOp    comp_ = NO_OP;
   FilterObj left_;
   FilterObj right_;
 };
@@ -103,17 +89,14 @@ private:
  * @brief Filter/谓词/过滤语句
  * @ingroup Statement
  */
-class FilterStmt 
+class FilterStmt
 {
 public:
   FilterStmt() = default;
   virtual ~FilterStmt();
 
 public:
-  const std::vector<FilterUnit *> &filter_units() const
-  {
-    return filter_units_;
-  }
+  const std::vector<FilterUnit *> &filter_units() const { return filter_units_; }
 
 public:
   static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
@@ -126,5 +109,5 @@ public:
 
 private:
   std::vector<FilterUnit *> filter_units_;
-  int                       link_type_ = 0;  // 0: AND, 1: OR 
+  int                       link_type_ = 0;  // 0: AND, 1: OR
 };

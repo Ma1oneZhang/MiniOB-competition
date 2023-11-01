@@ -144,6 +144,10 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     FilterObj filter_obj;
     filter_obj.init_valuelist(condition.left_value_list);
     filter_unit->set_left(filter_obj);
+  } else if (condition.left_is_attr == 4) {
+    FilterObj filter_obj;
+    filter_obj.init_expr(condition.left_expr);
+    filter_unit->set_left(filter_obj);
   }
 
   if (condition.right_is_attr == 1) {  // the right is attr
@@ -180,6 +184,10 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   } else if (condition.right_is_attr == 3) {
     FilterObj filter_obj;
     filter_obj.init_valuelist(condition.right_value_list);
+    filter_unit->set_right(filter_obj);
+  } else if (condition.right_is_attr == 4) {
+    FilterObj filter_obj;
+    filter_obj.init_expr(condition.right_expr);
     filter_unit->set_right(filter_obj);
   }
 
