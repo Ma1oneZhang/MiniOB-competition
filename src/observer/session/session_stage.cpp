@@ -84,7 +84,7 @@ static std::string add_space_to_string(std::string_view str)
   bool        is_str = false;
   for (int i = 0; i < str.size(); i++) {
     if (str[i] == '+' || str[i] == '-' || str[i] == '/' || str[i] == '*') {
-      if (is_id && !is_str) {
+      if ((is_id || str[i - 1] == ')') && !is_str) {
         result += " ";
         result += str[i];
         result += " ";
