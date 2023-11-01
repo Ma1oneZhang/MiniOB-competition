@@ -52,9 +52,14 @@ class Table;
 class TupleSchema
 {
 public:
-  void                 append_cell(const TupleCellSpec &cell) { cells_.push_back(cell); }
-  void                 append_cell(const char *table, const char *field) { append_cell(TupleCellSpec(table, field)); }
-  void                 append_cell(const char *alias) { append_cell(TupleCellSpec(alias)); }
+  void append_cell(const TupleCellSpec &cell) { cells_.push_back(cell); }
+  void append_cell(const char *table, const char *field) { append_cell(TupleCellSpec(table, field)); }
+  void append_cell(const char *alias) { append_cell(TupleCellSpec(alias)); }
+  void append_cell(Expression *expr)
+  {
+    auto cell = TupleCellSpec(expr);
+    append_cell(cell);
+  }
   int                  cell_num() const { return static_cast<int>(cells_.size()); }
   const TupleCellSpec &cell_at(int i) const { return cells_[i]; }
 
@@ -198,9 +203,7 @@ public:
 
   const Record &record() const { return record_; }
 
-  const char * get_table_name() {
-    return table_->name();
-  }
+  const char *get_table_name() { return table_->name(); }
 
 private:
   Record                 record_{};
@@ -242,6 +245,9 @@ public:
     }
 
     const TupleCellSpec *spec = speces_[index];
+    if (spec->is_expr()) {
+      return spec->expr()->get_value(*tuple_, cell);
+    }
     return tuple_->find_cell(*spec, cell);
   }
 

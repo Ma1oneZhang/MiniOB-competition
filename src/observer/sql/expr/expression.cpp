@@ -622,7 +622,8 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value)
     }
   }
 
-  if (right_->type() == ExprType::VALUE || right_->type() == ExprType::FIELD || right_->type() == ExprType::ARITHMETIC) {
+  if (right_->type() == ExprType::VALUE || right_->type() == ExprType::FIELD ||
+      right_->type() == ExprType::ARITHMETIC) {
     rc = right_->get_value(tuple, right_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
@@ -749,7 +750,8 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
         if (right_value.get_int() == 0) {
           // NOTE:
           // 设置为整数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为整数最大值。
-          value.set_int(numeric_limits<int>::max());
+          // value.set_int(numeric_limits<int>::max());
+          value.set_isnull();
         } else {
           value.set_int(left_value.get_int() / right_value.get_int());
         }
@@ -757,7 +759,8 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
         if (right_value.get_float() > -EPSILON && right_value.get_float() < EPSILON) {
           // NOTE:
           // 设置为浮点数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为浮点数最大值。
-          value.set_float(numeric_limits<float>::max());
+          // value.set_float(numeric_limits<float>::max());
+          value.set_isnull();
         } else {
           value.set_float(left_value.get_float() / right_value.get_float());
         }
@@ -792,10 +795,12 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value)
     LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
-  rc = right_->get_value(tuple, right_value);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
-    return rc;
+  if (right_) {
+    rc = right_->get_value(tuple, right_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
   return calc_value(left_value, right_value, value);
 }

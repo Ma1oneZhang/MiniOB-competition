@@ -262,8 +262,9 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
           LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), relation_attr.attribute_name.c_str());
           return RC::SCHEMA_FIELD_MISSING;
         }
-
-        query_fields.push_back(Field(table, field_meta));
+        if (is_query_field) {
+          query_fields.push_back(Field(table, field_meta));
+        }
       }
     }
     return RC::SUCCESS;

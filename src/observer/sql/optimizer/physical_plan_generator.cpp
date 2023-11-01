@@ -295,8 +295,11 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   for (const Field &field : project_fields) {
     if (field.get_aggr_type() != AggregationType::NONE) {
       project_operator->add_projection(field.table(), const_cast<Field &>(field));
-    } else
+    } else if (field.is_expr()) {
+      project_operator->add_projection(field.expr());
+    } else {
       project_operator->add_projection(field.table(), field.meta());
+    }
   }
 
   if (child_phy_oper) {

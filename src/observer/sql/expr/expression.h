@@ -442,9 +442,11 @@ public:
   virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override
   {
     auto l = left_->get_rel_attr_sql_node();
-    auto r = right_->get_rel_attr_sql_node();
-    l.insert(l.end(), r.begin(), r.end());
-    return r;
+    if (right_) {
+      auto r = right_->get_rel_attr_sql_node();
+      l.insert(l.end(), r.begin(), r.end());
+    }
+    return l;
   };
   virtual RC set_table_name(std::vector<Table *> &query_tables) override
   {
@@ -452,7 +454,9 @@ public:
     if (rc != RC::SUCCESS) {
       return rc;
     }
-    rc = right_->set_table_name(query_tables);
+    if (right_) {
+      rc = right_->set_table_name(query_tables);
+    }
     return rc;
   }
 

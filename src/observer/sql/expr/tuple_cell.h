@@ -14,31 +14,34 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
-#include <iostream>
-#include "storage/table/table.h"
-#include "storage/field/field_meta.h"
+#include "sql/expr/expression.h"
+#include <string>
 
 class TupleCellSpec
 {
 public:
   TupleCellSpec(const char *table_name, const char *field_name, const char *alias = nullptr);
   TupleCellSpec(const char *alias);
+  TupleCellSpec(std::string alias) { alias_ = alias; }
+  TupleCellSpec(Expression *expr, const char *alias = nullptr)
+  {
+    expr_ = expr;
+    if (alias != nullptr) {
+      alias_ = alias;
+    } else {
+      alias_ = expr->name();
+    }
+  }
 
-  const char *table_name() const
-  {
-    return table_name_.c_str();
-  }
-  const char *field_name() const
-  {
-    return field_name_.c_str();
-  }
-  const char *alias() const
-  {
-    return alias_.c_str();
-  }
+  const char *table_name() const { return table_name_.c_str(); }
+  const char *field_name() const { return field_name_.c_str(); }
+  const char *alias() const { return alias_.c_str(); }
+  bool        is_expr() const { return expr_ != nullptr; }
+  Expression *expr() const { return expr_; }
 
 private:
   std::string table_name_;
   std::string field_name_;
   std::string alias_;
+  Expression *expr_ = nullptr;
 };

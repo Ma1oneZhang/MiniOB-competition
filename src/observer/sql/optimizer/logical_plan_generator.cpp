@@ -108,13 +108,14 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       // count(*)
       if (field.get_aggr_type() == AggregationType::COUNT && field.table() == nullptr) {
         fields.push_back(field);
+      } else if (field.is_expr()) {
       } else if (0 == strcmp(field.table_name(), table->name())) {
         fields.push_back(field);
       }
     }
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, true /*readonly*/));
     for (const Field &field : all_fields) {
-      if (0 == strcmp(field.table_name(), table->name()) && field.get_aggr_type() == AggregationType::NONE) {
+      if (!field.is_expr() && 0 == strcmp(field.table_name(), table->name()) && field.get_aggr_type() == AggregationType::NONE) {
         group_by.push_back(field);
       }
     }
