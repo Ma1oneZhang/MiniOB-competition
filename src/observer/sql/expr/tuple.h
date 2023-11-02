@@ -253,8 +253,7 @@ public:
 
   RC find_cell(const TupleCellSpec &spec, Value &cell) const override { return tuple_->find_cell(spec, cell); }
 
-#if 0
-  RC cell_spec_at(int index, const TupleCellSpec *&spec) const override
+  RC cell_spec_at(int index, TupleCellSpec *&spec) const
   {
     if (index < 0 || index >= static_cast<int>(speces_.size())) {
       return RC::NOTFOUND;
@@ -262,7 +261,7 @@ public:
     spec = speces_[index];
     return RC::SUCCESS;
   }
-#endif
+
 private:
   std::vector<TupleCellSpec *> speces_;
   Tuple                       *tuple_ = nullptr;
