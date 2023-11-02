@@ -115,7 +115,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     table_map[table_name] = table;
   }
   // collect query fields in `select` statement
-  std::vector<Field> query_fields;
+  std::vector<Field>query_fields;
   auto               checker = [&](RelAttrSqlNode &relation_attr, bool is_query_field) {
     if (relation_attr.aggregation_type != AggregationType::NONE) {
       // aggregation function
