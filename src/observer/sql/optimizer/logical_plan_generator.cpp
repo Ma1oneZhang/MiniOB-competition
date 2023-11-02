@@ -102,19 +102,28 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   bool               aggr = false;
   for (Table *table : tables) {
     for (const Field &field : all_fields) {
+      
       if (field.get_aggr_type() != AggregationType::NONE) {
         aggr = true;
+      } else if (field.is_expr()) {
+        for (auto i : field.expr()->get_fields()) {
+          if (i.get_aggr_type() != AggregationType::NONE) {
+            aggr = true;
+            break;
+          }
+        }
       }
       // count(*)
       if (field.get_aggr_type() == AggregationType::COUNT && field.table() == nullptr) {
         fields.push_back(field);
+      } else if (field.is_expr()) {
       } else if (0 == strcmp(field.table_name(), table->name())) {
         fields.push_back(field);
       }
     }
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, true /*readonly*/));
     for (const Field &field : all_fields) {
-      if (0 == strcmp(field.table_name(), table->name()) && field.get_aggr_type() == AggregationType::NONE) {
+      if (!field.is_expr() && 0 == strcmp(field.table_name(), table->name()) && field.get_aggr_type() == AggregationType::NONE) {
         group_by.push_back(field);
       }
     }
@@ -130,6 +139,15 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   if (aggr) {
     auto fields_ = fields;
+    for (auto i : all_fields) {
+      if(i.is_expr()){
+        for (auto j : i.expr()->get_fields()) {
+          if (j.get_aggr_type() != AggregationType::NONE) {
+            fields_.push_back(j);
+          }
+        }
+      }
+    }
     fields_.insert(fields_.begin(), select_stmt->having().begin(), select_stmt->having().end());
     unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(fields_, group_by));
     aggregation_oper.swap(aggr_oper);
@@ -211,7 +229,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   std::vector<unique_ptr<Expression>> cmp_exprs;
   ConjunctionExpr::Type               link_type =
       filter_stmt->get_link_type() == 0 ? ConjunctionExpr::Type::AND : ConjunctionExpr::Type::OR;
-  const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
+  const std::vector<FilterUnit *> &filter_units = filter_stmt->filter_units();
   for (const FilterUnit *filter_unit : filter_units) {
     const FilterObj &filter_obj_left  = filter_unit->left();
     const FilterObj &filter_obj_right = filter_unit->right();
@@ -253,6 +271,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         left.reset(static_cast<Expression *>(new OperExpr(left_sub_query_oper)));
       } break;
       case 3: left.reset(static_cast<Expression *>(new ValueListExpr(filter_obj_left.value_list))); break;
+      case 4: left.reset(filter_obj_left.expr_);
       default: break;
     }
 
@@ -286,6 +305,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         right.reset(static_cast<Expression *>(new OperExpr(right_sub_query_oper)));
       } break;
       case 3: right.reset(static_cast<Expression *>(new ValueListExpr(filter_obj_right.value_list))); break;
+      case 4: right.reset(filter_obj_right.expr_);
       default: break;
     }
 

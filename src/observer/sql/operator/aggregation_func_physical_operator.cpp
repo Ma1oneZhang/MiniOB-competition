@@ -75,7 +75,7 @@ RC AggregationPhysicalOperator::next()
         const auto &field = aggr_fields_[i];
         if (field.get_aggr_type() == AggregationType::NONE) {
           continue;
-        } else if (std::string(field.field_name()) == std::string("COUNT(*)")) {
+        } else if (std::string(field.aggr_name()) == std::string("COUNT(*)")) {
           auto &map = maps_.at(pos);
           auto  v   = Value{};
           auto  rc  = map(group_by_values, v, AggregationType::COUNT);
@@ -96,7 +96,7 @@ RC AggregationPhysicalOperator::next()
       }
       for (auto field : aggr_fields_) {}
     }
-    
+
     if (rc != RC::SUCCESS && rc != RC::RECORD_EOF)
       return rc;
 
@@ -129,8 +129,13 @@ RC AggregationPhysicalOperator::next()
   }
 
   // get aggr result
+  TupleCellSpec spec(nullptr, nullptr, nullptr);
   for (size_t i = 0; i < aggr_fields_.size(); i++) {
-    TupleCellSpec spec{aggr_fields_[i].table_name(), aggr_fields_[i].field_name(), aggr_fields_[i].field_name()};
+    if (aggr_fields_[i].get_aggr_type() == AggregationType::COUNT && aggr_fields_[i].meta() == nullptr) {
+      spec = {aggr_fields_[i].table_name(), aggr_fields_[i].aggr_name(), aggr_fields_[i].aggr_name()};
+    } else {
+      spec = {aggr_fields_[i].table_name(), aggr_fields_[i].field_name(), aggr_fields_[i].aggr_name()};
+    };
     tuple_ptr->add_cell_spec(spec);
     const auto &aggr_result = iters_.at(pos_of_map)->second.second;
     switch (aggr_fields_[i].get_aggr_type()) {

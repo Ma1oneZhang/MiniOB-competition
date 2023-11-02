@@ -77,6 +77,31 @@ void SessionStage::handle_event(StageEvent *event)
   return;
 }
 
+static std::string add_space_to_string(std::string_view str)
+{
+  std::string result;
+  bool        is_id  = false;
+  bool        is_str = false;
+  for (int i = 0; i < str.size(); i++) {
+    if (str[i] == '+' || str[i] == '-' || str[i] == '/' || str[i] == '*') {
+      if ((is_id || str[i - 1] == ')') && !is_str) {
+        result += " ";
+        result += str[i];
+        result += " ";
+      } else {
+        result += str[i];
+      }
+    } else if (str[i] == '\'') {
+      is_str ^= true;
+      result += str[i];
+    } else {
+      result += str[i];
+      is_id = isalnum(str[i]);
+    }
+  }
+  return result;
+}
+
 void SessionStage::handle_request(StageEvent *event)
 {
   SessionEvent *sev = dynamic_cast<SessionEvent *>(event);
@@ -89,6 +114,7 @@ void SessionStage::handle_request(StageEvent *event)
   if (common::is_blank(sql.c_str())) {
     return;
   }
+  sql = add_space_to_string(sql);
 
   Session::set_current_session(sev->session());
   sev->session()->set_current_request(sev);

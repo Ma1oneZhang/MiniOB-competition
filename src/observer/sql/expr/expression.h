@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include <memory>
 #include <string>
 
+#include "sql/parser/parse_defs.h"
 #include "storage/field/field.h"
 #include "sql/parser/value.h"
 #include "common/log/log.h"
@@ -97,14 +98,21 @@ public:
   /**
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
-  virtual std::string name() const { return name_; }
-  virtual void        set_name(std::string name) { name_ = name; }
+  virtual std::string                      name() const { return name_; }
+  virtual void                             set_name(std::string name) { name_ = name; }
+  virtual std::vector<RelAttrSqlNode>      get_rel_attr_sql_node() { return {}; }
+  virtual std::vector<Field>               get_fields() { return {}; }
+  std::unordered_map<std::string, Tuple *> get_parent_query_tuples() { return parent_query_tuples_; };
+  RC set_parent_query_tuples(unordered_map<std::string, Tuple *> parent_query_tuples)
+  {
+    parent_query_tuples_ = parent_query_tuples;
+    return RC::SUCCESS;
+  }
 
-  std::unordered_map<std::string, Tuple *> get_parent_query_tuples() {return parent_query_tuples_; };
-  RC set_parent_query_tuples(unordered_map<std::string, Tuple *> parent_query_tuples) {parent_query_tuples_ = parent_query_tuples; return RC::SUCCESS;}
+  virtual RC set_table_name(std::vector<Table *> &) { return RC::SUCCESS; }
 
 private:
-  std::string name_;
+  std::string                              name_;
   std::unordered_map<std::string, Tuple *> parent_query_tuples_;
 };
 
@@ -118,6 +126,7 @@ public:
   FieldExpr() = default;
   FieldExpr(const Table *table, const FieldMeta *field) : field_(table, field) {}
   FieldExpr(const Field &field) : field_(field) {}
+  FieldExpr(RelAttrSqlNode rel_attr_sql_node) : sql_node_(rel_attr_sql_node) {}
 
   virtual ~FieldExpr() = default;
 
@@ -130,12 +139,39 @@ public:
 
   const char *table_name() const { return field_.table_name(); }
 
-  const char *field_name() const { return field_.field_name(); }
-
-  RC get_value(const Tuple &tuple, Value &value) override;
+  const char *field_name() const { return field_.meta() == nullptr ? "COUNT(*)" : field_.field_name(); }
+  virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override { return {sql_node_}; }
+  virtual std::vector<Field>          get_fields() override { return {field_}; }
+  RC                                  get_value(const Tuple &tuple, Value &value) override;
+  RelAttrSqlNode                     &get_sql_node() { return sql_node_; }
+  virtual RC                          set_table_name(std::vector<Table *> &query_tables) override
+  {
+    if (sql_node_.relation_name != "") {
+      for (auto table : query_tables) {
+        if (table->name() == sql_node_.relation_name) {
+          field_ =
+              Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()), sql_node_.aggregation_type);
+          return RC::SUCCESS;
+        }
+      }
+    } else {
+      if (sql_node_.attribute_name == "*") {
+        return RC::SUCCESS;
+      }
+      for (auto table : query_tables) {
+        if (table->table_meta().field(sql_node_.attribute_name.c_str())) {
+          field_ =
+              Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()), sql_node_.aggregation_type);
+          return RC::SUCCESS;
+        }
+      }
+    }
+    return RC::NOTFOUND;
+  }
 
 private:
-  Field field_;
+  Field          field_;
+  RelAttrSqlNode sql_node_;
 };
 
 /**
@@ -177,18 +213,15 @@ public:
 
   virtual ~ValueListExpr() = default;
 
-  RC get_value(const Tuple &tuple, Value &value) override {return RC::SUCCESS;}
+  RC get_value(const Tuple &tuple, Value &value) override { return RC::SUCCESS; }
 
-  RC try_get_value(Value &value) const override
-  {
-    return RC::SUCCESS;
-  }
+  RC try_get_value(Value &value) const override { return RC::SUCCESS; }
 
   ExprType type() const override { return ExprType::VALUELIST; }
 
   AttrType value_type() const override { return value_list_[0].attr_type(); }
 
-  vector<Value> &get_valuelist() {return value_list_;}
+  vector<Value> &get_valuelist() { return value_list_; }
 
 private:
   vector<Value> value_list_;
@@ -197,13 +230,14 @@ private:
 /**
  * @brief 子查询表达式
  * @ingroup Expression
-  */
- class OperExpr : public Expression
- {
+ */
+class OperExpr : public Expression
+{
 public:
   OperExpr() = default;
-  OperExpr(unique_ptr<LogicalOperator> &logic_oper) { 
-    logic_oper_ = std::move(logic_oper); 
+  OperExpr(unique_ptr<LogicalOperator> &logic_oper)
+  {
+    logic_oper_ = std::move(logic_oper);
     set_name("Sub-qeury");
   }
 
@@ -230,7 +264,7 @@ private:
   unique_ptr<LogicalOperator>  logic_oper_;
   unique_ptr<PhysicalOperator> physic_oper_;
   std::vector<Value>           subquery_results;
- };
+};
 
 /**
  * @brief 类型转换表达式
@@ -296,7 +330,31 @@ public:
 
   RC compare_valuelist(const Value &left, const Value &right, bool &value) const;
 
-  RC like_operation(const Value &left, const Value &right, bool &value, bool do_like) const;
+  RC                         like_operation(const Value &left, const Value &right, bool &value, bool do_like) const;
+  virtual std::vector<Field> get_fields() override
+  {
+    auto l = left_->get_fields();
+    auto r = right_->get_fields();
+    l.insert(l.end(), r.begin(), r.end());
+    return l;
+  }
+  virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override
+  {
+    auto l = left_->get_rel_attr_sql_node();
+    auto r = right_->get_rel_attr_sql_node();
+    l.insert(l.end(), r.begin(), r.end());
+    return l;
+  };
+
+  virtual RC set_table_name(std::vector<Table *> &query_tables) override
+  {
+    auto rc = left_->set_table_name(query_tables);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    rc = right_->set_table_name(query_tables);
+    return rc;
+  }
 
 private:
   CompOp                      comp_;
@@ -332,6 +390,34 @@ public:
   Type conjunction_type() const { return conjunction_type_; }
 
   std::vector<std::unique_ptr<Expression>> &children() { return children_; }
+  virtual std::vector<Field>                get_fields() override
+  {
+    std::vector<Field> result;
+    for (auto &expr : children_) {
+      auto child_field = expr->get_fields();
+      result.insert(result.end(), child_field.begin(), child_field.end());
+    }
+    return result;
+  }
+  virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override
+  {
+    std::vector<RelAttrSqlNode> sql_nodes;
+    for (auto &expr : children_) {
+      auto child_field = expr->get_rel_attr_sql_node();
+      sql_nodes.insert(sql_nodes.end(), child_field.begin(), child_field.end());
+    }
+    return sql_nodes;
+  }
+  virtual RC set_table_name(std::vector<Table *> &query_tables) override
+  {
+    for (auto &expr : children_) {
+      auto rc = expr->set_table_name(query_tables);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+    }
+    return RC::SUCCESS;
+  }
 
 private:
   Type                                     conjunction_type_;
@@ -370,6 +456,36 @@ public:
 
   std::unique_ptr<Expression> &left() { return left_; }
   std::unique_ptr<Expression> &right() { return right_; }
+
+  virtual std::vector<Field> get_fields() override
+  {
+    auto l = left_->get_fields();
+    if (right_) {
+      auto r = right_->get_fields();
+      l.insert(l.end(), r.begin(), r.end());
+    }
+    return l;
+  }
+  virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override
+  {
+    auto l = left_->get_rel_attr_sql_node();
+    if (right_) {
+      auto r = right_->get_rel_attr_sql_node();
+      l.insert(l.end(), r.begin(), r.end());
+    }
+    return l;
+  };
+  virtual RC set_table_name(std::vector<Table *> &query_tables) override
+  {
+    auto rc = left_->set_table_name(query_tables);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    if (right_) {
+      rc = right_->set_table_name(query_tables);
+    }
+    return rc;
+  }
 
 private:
   RC calc_value(const Value &left_value, const Value &right_value, Value &value) const;

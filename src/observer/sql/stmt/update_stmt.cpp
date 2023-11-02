@@ -90,9 +90,25 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     }
     field_names.push_back(update.attribute_name[i]);
   }
+  std::vector<Table *> tables = {table};
+  for (auto &i : update.conditions) {
+    if (i.left_is_attr == 4) {
+      auto rc = i.left_expr->set_table_name(tables);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+    }
+    if (i.right_is_attr == 4) {
+      auto rc = i.right_expr->set_table_name(tables);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+    }
+  }
   FilterStmt *filter = nullptr;
   if (update.conditions.size() != 0) {
-    auto rc = FilterStmt::create(db, table, nullptr, update.conditions.data(), update.conditions.size(), filter);
+    auto rc = FilterStmt::create(
+        db, table, nullptr, const_cast<ConditionSqlNode *>(update.conditions.data()), update.conditions.size(), filter);
     if (rc != RC::SUCCESS) {
       return rc;
     }

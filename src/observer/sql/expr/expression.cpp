@@ -25,7 +25,7 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value)
   RC rc = tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
 
   if (rc == RC::NOTFOUND) {
-    for(auto& pair: get_parent_query_tuples()) {
+    for (auto &pair : get_parent_query_tuples()) {
       rc = pair.second->find_cell(TupleCellSpec(table_name(), field_name()), value);
       if (rc == RC::SUCCESS) {
         break;
@@ -100,7 +100,7 @@ ComparisonExpr::~ComparisonExpr() {}
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
   RC rc = RC::SUCCESS;
-  switch(comp_) {
+  switch (comp_) {
     case CompOp::LIKE_OP:
     case CompOp::NOT_LIKE_OP: {
       // DO like operation
@@ -114,10 +114,9 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
       result = !(left.get_isnull());
       return rc;
     } break;
-    default:
-      break;
+    default: break;
   }
-  if(left.get_isnull() | right.get_isnull()) {
+  if (left.get_isnull() | right.get_isnull()) {
     result = false;
     return rc;
   }
@@ -160,34 +159,34 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
 
 RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool &result)
 {
-  RC rc;
+  RC    rc;
   Value left_value;
   Value right_value;
 
   if (left_->type() == ExprType::SUB_QUERY & right_->type() == ExprType::SUB_QUERY) {
-    OperExpr *loper = dynamic_cast<OperExpr*>(left_.get());
-    rc = loper->catch_subquery_results();
-    if (rc != RC::SUCCESS)
-      return rc;
-    
-    OperExpr *roper = dynamic_cast<OperExpr*>(right_.get());
-    rc = roper->catch_subquery_results();
+    OperExpr *loper = dynamic_cast<OperExpr *>(left_.get());
+    rc              = loper->catch_subquery_results();
     if (rc != RC::SUCCESS)
       return rc;
 
-    std::vector<Value> &left_subquery_results = loper->get_subquery_results();
+    OperExpr *roper = dynamic_cast<OperExpr *>(right_.get());
+    rc              = roper->catch_subquery_results();
+    if (rc != RC::SUCCESS)
+      return rc;
+
+    std::vector<Value> &left_subquery_results  = loper->get_subquery_results();
     std::vector<Value> &right_subquery_results = roper->get_subquery_results();
     switch (comp_) {
       case CompOp::IN_OP: {
         int left_row_count = left_subquery_results.size();
-        if(left_row_count > 1) {
+        if (left_row_count > 1) {
           return RC::SUBQUERY_TOO_MANY_ROWS;
         }
         left_value = left_subquery_results[0];
 
         result = false;
-        for(int i=0; i< right_subquery_results.size();i++) {
-          right_value = right_subquery_results[i];
+        for (int i = 0; i < right_subquery_results.size(); i++) {
+          right_value     = right_subquery_results[i];
           bool bool_value = false;
           rc              = compare_value(left_value, right_value, bool_value);
           if (rc == RC::SUCCESS) {
@@ -204,14 +203,14 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
       } break;
       case CompOp::NOT_IN_OP: {
         int left_row_count = left_subquery_results.size();
-        if(left_row_count > 1) {
+        if (left_row_count > 1) {
           return RC::SUBQUERY_TOO_MANY_ROWS;
         }
         left_value = left_subquery_results[0];
 
         result = true;
-        for(int i=0; i< right_subquery_results.size();i++) {
-          right_value = right_subquery_results[i];
+        for (int i = 0; i < right_subquery_results.size(); i++) {
+          right_value     = right_subquery_results[i];
           bool bool_value = false;
           rc              = compare_value(left_value, right_value, bool_value);
           if (rc == RC::SUCCESS) {
@@ -226,7 +225,7 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
         }
         return RC::SUCCESS;
       } break;
-      case CompOp::EQUAL_TO: 
+      case CompOp::EQUAL_TO:
       case CompOp::GREAT_EQUAL:
       case CompOp::GREAT_THAN:
       case CompOp::LESS_EQUAL:
@@ -234,44 +233,43 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
       case CompOp::NOT_EQUAL: {
         // check the row number
         int left_row_count = left_subquery_results.size();
-        if(left_row_count > 1) {
+        if (left_row_count > 1) {
           return RC::SUBQUERY_TOO_MANY_ROWS;
         }
         left_value = left_subquery_results[0];
 
         int right_row_count = right_subquery_results.size();
-        if(right_row_count > 1) {
+        if (right_row_count > 1) {
           return RC::SUBQUERY_TOO_MANY_ROWS;
         }
-        
 
         // set default result
         result = false;
-        
-        if (left_row_count == 1 && right_row_count==1) {
-          left_value = left_subquery_results[0];
+
+        if (left_row_count == 1 && right_row_count == 1) {
+          left_value  = left_subquery_results[0];
           right_value = right_subquery_results[0];
           rc          = compare_value(left_value, right_value, result);
           if (rc != RC::SUCCESS)
             return rc;
         }
-        
+
         return RC::SUCCESS;
       } break;
     }
   } else if (left_->type() == ExprType::SUB_QUERY & right_->type() != ExprType::SUB_QUERY) {
     // open sub-query operator, execute sub-query if has not executed
-    OperExpr * oper = dynamic_cast<OperExpr*>(left_.get());
-    rc = oper->catch_subquery_results();
+    OperExpr *oper = dynamic_cast<OperExpr *>(left_.get());
+    rc             = oper->catch_subquery_results();
     if (rc != RC::SUCCESS)
       return rc;
-    
+
     std::vector<Value> &subquery_results = oper->get_subquery_results();
     switch (comp_) {
       case CompOp::IN_OP: {
         result = false;
-        for(int i=0; i< subquery_results.size();i++) {
-          left_value = subquery_results[i];
+        for (int i = 0; i < subquery_results.size(); i++) {
+          left_value      = subquery_results[i];
           bool bool_value = false;
           rc              = compare_value(left_value, right, bool_value);
           if (rc == RC::SUCCESS) {
@@ -288,9 +286,9 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
       } break;
       case CompOp::NOT_IN_OP: {
         result = true;
-        
-        for(int i=0; i< subquery_results.size();i++) {
-          left_value = subquery_results[i];
+
+        for (int i = 0; i < subquery_results.size(); i++) {
+          left_value      = subquery_results[i];
           bool bool_value = false;
           rc              = compare_value(left_value, right, bool_value);
           if (rc == RC::SUCCESS) {
@@ -305,7 +303,7 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
         }
         return RC::SUCCESS;
       } break;
-      case CompOp::EQUAL_TO: 
+      case CompOp::EQUAL_TO:
       case CompOp::GREAT_EQUAL:
       case CompOp::GREAT_THAN:
       case CompOp::LESS_EQUAL:
@@ -313,36 +311,36 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
       case CompOp::NOT_EQUAL: {
         // check the row number
         int row_count = subquery_results.size();
-        if(row_count > 1) {
+        if (row_count > 1) {
           return RC::SUBQUERY_TOO_MANY_ROWS;
         }
 
         // set default result
         result = false;
-        
-        if (row_count == 1){
+
+        if (row_count == 1) {
           left_value = subquery_results[0];
-          rc          = compare_value(left_value, right, result);
+          rc         = compare_value(left_value, right, result);
           if (rc != RC::SUCCESS)
             return rc;
         }
-        
+
         return RC::SUCCESS;
       } break;
     }
   } else if (left_->type() != ExprType::SUB_QUERY & right_->type() == ExprType::SUB_QUERY) {
     // open sub-query operator, execute sub-query if has not executed
-    OperExpr * oper = dynamic_cast<OperExpr*>(right_.get());
-    rc = oper->catch_subquery_results();
+    OperExpr *oper = dynamic_cast<OperExpr *>(right_.get());
+    rc             = oper->catch_subquery_results();
     if (rc != RC::SUCCESS)
       return rc;
-    
+
     std::vector<Value> &subquery_results = oper->get_subquery_results();
     switch (comp_) {
       case CompOp::IN_OP: {
         result = false;
-        for(int i=0; i< subquery_results.size();i++) {
-          right_value = subquery_results[i];
+        for (int i = 0; i < subquery_results.size(); i++) {
+          right_value     = subquery_results[i];
           bool bool_value = false;
           rc              = compare_value(left, right_value, bool_value);
           if (rc == RC::SUCCESS) {
@@ -359,9 +357,9 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
       }
       case CompOp::NOT_IN_OP: {
         result = true;
-        
-        for(int i=0; i< subquery_results.size();i++) {
-          right_value = subquery_results[i];
+
+        for (int i = 0; i < subquery_results.size(); i++) {
+          right_value     = subquery_results[i];
           bool bool_value = false;
           rc              = compare_value(left, right_value, bool_value);
           if (rc == RC::SUCCESS) {
@@ -376,29 +374,28 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
         }
         return RC::SUCCESS;
       }
-      case CompOp::EQUAL_TO: 
+      case CompOp::EQUAL_TO:
       case CompOp::GREAT_EQUAL:
       case CompOp::GREAT_THAN:
       case CompOp::LESS_EQUAL:
       case CompOp::LESS_THAN:
-      case CompOp::NOT_EQUAL:
-      {
+      case CompOp::NOT_EQUAL: {
         // check the row number
         int row_count = subquery_results.size();
-        if(row_count > 1) {
+        if (row_count > 1) {
           return RC::SUBQUERY_TOO_MANY_ROWS;
         }
 
         // set default result
         result = false;
-        
-        if (row_count == 1){
+
+        if (row_count == 1) {
           right_value = subquery_results[0];
           rc          = compare_value(left, right_value, result);
           if (rc != RC::SUCCESS)
             return rc;
         }
-        
+
         return RC::SUCCESS;
       } break;
     }
@@ -410,20 +407,20 @@ RC ComparisonExpr::compare_sub_query(const Value &left, const Value &right, bool
 
 RC ComparisonExpr::compare_valuelist(const Value &left, const Value &right, bool &result) const
 {
-  RC rc;
+  RC       rc;
   RowTuple tuple;
-  Value left_value;
-  Value right_value;
+  Value    left_value;
+  Value    right_value;
 
   if (left_->type() == ExprType::VALUELIST & right_->type() != ExprType::VALUELIST) {
     // open sub-query operator, execute sub-query if has not executed
-    ValueListExpr *vlexpr = dynamic_cast<ValueListExpr*>(left_.get());
-    vector<Value> vl = vlexpr->get_valuelist();
+    ValueListExpr *vlexpr = dynamic_cast<ValueListExpr *>(left_.get());
+    vector<Value>  vl     = vlexpr->get_valuelist();
     switch (comp_) {
       case CompOp::IN_OP: {
         result = false;
-        for (int i =0; i<vl.size(); i++) {
-          left_value = vl[i];
+        for (int i = 0; i < vl.size(); i++) {
+          left_value      = vl[i];
           bool bool_value = false;
           rc              = compare_value(left_value, right, bool_value);
           if (rc == RC::SUCCESS) {
@@ -436,14 +433,14 @@ RC ComparisonExpr::compare_valuelist(const Value &left, const Value &right, bool
             return rc;
           }
         }
-        
+
         return RC::SUCCESS;
       } break;
       case CompOp::NOT_IN_OP: {
         result = true;
-        
-        for(int i=0; i< vl.size();i++) {
-          left_value = vl[i];
+
+        for (int i = 0; i < vl.size(); i++) {
+          left_value      = vl[i];
           bool bool_value = false;
           rc              = compare_value(left_value, right, bool_value);
           if (rc == RC::SUCCESS) {
@@ -458,7 +455,7 @@ RC ComparisonExpr::compare_valuelist(const Value &left, const Value &right, bool
         }
         return RC::SUCCESS;
       } break;
-      case CompOp::EQUAL_TO: 
+      case CompOp::EQUAL_TO:
       case CompOp::GREAT_EQUAL:
       case CompOp::GREAT_THAN:
       case CompOp::LESS_EQUAL:
@@ -466,33 +463,32 @@ RC ComparisonExpr::compare_valuelist(const Value &left, const Value &right, bool
       case CompOp::NOT_EQUAL: {
         // check the row number
         int row_count = vl.size();
-        if(row_count > 1) {
+        if (row_count > 1) {
           return RC::SUBQUERY_TOO_MANY_ROWS;
         }
 
         // set default result
         result = false;
-        
-        if (row_count == 1){
+
+        if (row_count == 1) {
           left_value = vl[0];
-          rc          = compare_value(left_value, right, result);
+          rc         = compare_value(left_value, right, result);
           if (rc != RC::SUCCESS)
             return rc;
         }
-        
+
         return RC::SUCCESS;
       } break;
     }
-  }
-  else if (left_->type() != ExprType::VALUELIST & right_->type() == ExprType::VALUELIST) {
+  } else if (left_->type() != ExprType::VALUELIST & right_->type() == ExprType::VALUELIST) {
     // open sub-query operator, execute sub-query if has not executed
-    ValueListExpr *vlexpr = dynamic_cast<ValueListExpr*>(right_.get());
-    vector<Value> vl = vlexpr->get_valuelist();
+    ValueListExpr *vlexpr = dynamic_cast<ValueListExpr *>(right_.get());
+    vector<Value>  vl     = vlexpr->get_valuelist();
     switch (comp_) {
       case CompOp::IN_OP: {
         result = false;
-        for(int i=0; i< vl.size();i++) {
-          right_value = vl[i];
+        for (int i = 0; i < vl.size(); i++) {
+          right_value     = vl[i];
           bool bool_value = false;
           rc              = compare_value(left, right_value, bool_value);
           if (rc == RC::SUCCESS) {
@@ -509,9 +505,9 @@ RC ComparisonExpr::compare_valuelist(const Value &left, const Value &right, bool
       }
       case CompOp::NOT_IN_OP: {
         result = true;
-        
-        for(int i=0; i< vl.size();i++) {
-          right_value = vl[i];
+
+        for (int i = 0; i < vl.size(); i++) {
+          right_value     = vl[i];
           bool bool_value = false;
           rc              = compare_value(left, right_value, bool_value);
           if (rc == RC::SUCCESS) {
@@ -526,29 +522,28 @@ RC ComparisonExpr::compare_valuelist(const Value &left, const Value &right, bool
         }
         return RC::SUCCESS;
       }
-      case CompOp::EQUAL_TO: 
+      case CompOp::EQUAL_TO:
       case CompOp::GREAT_EQUAL:
       case CompOp::GREAT_THAN:
       case CompOp::LESS_EQUAL:
       case CompOp::LESS_THAN:
-      case CompOp::NOT_EQUAL:
-      {
+      case CompOp::NOT_EQUAL: {
         // check the row number
         int row_count = vl.size();
-        if(row_count > 1) {
+        if (row_count > 1) {
           return RC::SUBQUERY_TOO_MANY_ROWS;
         }
 
         // set default result
         result = false;
-        
-        if (row_count == 1){
+
+        if (row_count == 1) {
           right_value = vl[0];
           rc          = compare_value(left, right_value, result);
           if (rc != RC::SUCCESS)
             return rc;
         }
-        
+
         return RC::SUCCESS;
       } break;
     }
@@ -619,7 +614,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value)
   left_->set_parent_query_tuples(get_parent_query_tuples());
   right_->set_parent_query_tuples(get_parent_query_tuples());
 
-  if (left_->type() == ExprType::VALUE | left_->type() == ExprType::FIELD) {
+  if (left_->type() == ExprType::VALUE || left_->type() == ExprType::FIELD || left_->type() == ExprType::ARITHMETIC) {
     rc = left_->get_value(tuple, left_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
@@ -627,7 +622,8 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value)
     }
   }
 
-  if (right_->type() == ExprType::VALUE | right_->type() == ExprType::FIELD) {
+  if (right_->type() == ExprType::VALUE || right_->type() == ExprType::FIELD ||
+      right_->type() == ExprType::ARITHMETIC) {
     rc = right_->get_value(tuple, right_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
@@ -723,7 +719,10 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
   RC rc = RC::SUCCESS;
 
   const AttrType target_type = value_type();
-
+  if (left_value.get_isnull() || right_value.get_isnull()) {
+    value.set_isnull();
+    return rc;
+  }
   switch (arithmetic_type_) {
     case Type::ADD: {
       if (target_type == AttrType::INTS) {
@@ -754,7 +753,8 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
         if (right_value.get_int() == 0) {
           // NOTE:
           // 设置为整数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为整数最大值。
-          value.set_int(numeric_limits<int>::max());
+          // value.set_int(numeric_limits<int>::max());
+          value.set_isnull();
         } else {
           value.set_int(left_value.get_int() / right_value.get_int());
         }
@@ -762,7 +762,8 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
         if (right_value.get_float() > -EPSILON && right_value.get_float() < EPSILON) {
           // NOTE:
           // 设置为浮点数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为浮点数最大值。
-          value.set_float(numeric_limits<float>::max());
+          // value.set_float(numeric_limits<float>::max());
+          value.set_isnull();
         } else {
           value.set_float(left_value.get_float() / right_value.get_float());
         }
@@ -797,10 +798,12 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value)
     LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
-  rc = right_->get_value(tuple, right_value);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
-    return rc;
+  if (right_) {
+    rc = right_->get_value(tuple, right_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
   return calc_value(left_value, right_value, value);
 }
@@ -834,21 +837,22 @@ RC OperExpr::get_value(const Tuple &tuple, Value &value)
 {
   physic_oper_->set_parent_query_tuples(get_parent_query_tuples());
   RC rc = physic_oper_->next();
-  if (rc == RC::SUCCESS){
-    Tuple* sub_query_tuple = physic_oper_->current_tuple();
-    int cell_num = sub_query_tuple->cell_num();
+  if (rc == RC::SUCCESS) {
+    Tuple *sub_query_tuple = physic_oper_->current_tuple();
+    int    cell_num        = sub_query_tuple->cell_num();
     if (cell_num > 1) {
       return RC::SUBQUERY_TOO_MANY_COLUMNS;
     }
     rc = sub_query_tuple->cell_at(0, value);
     return rc;
-  } else{
+  } else {
     return rc;
   }
 }
 
-RC OperExpr::catch_subquery_results(){
-  RC rc;
+RC OperExpr::catch_subquery_results()
+{
+  RC       rc;
   RowTuple tuple;
 
   // reopen operator
@@ -858,10 +862,10 @@ RC OperExpr::catch_subquery_results(){
 
   // start to load data
   subquery_results.clear();
-  while(true) {
+  while (true) {
     Value value;
     rc = get_value(tuple, value);
-    if(rc == RC::SUCCESS)
+    if (rc == RC::SUCCESS)
       subquery_results.push_back(value);
     else if (rc == RC::RECORD_EOF)
       break;

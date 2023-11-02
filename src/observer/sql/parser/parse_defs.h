@@ -107,21 +107,23 @@ struct ConditionSqlNode
 
   int left_is_attr;               ///< TRUE if left-hand side is an attribute
                                   ///< 1时，操作符左边是属性名，0时，是属性值
-                                  ///< 0: value, 1: rel_attr, 2: sub_qery, 3: value list
+                                  ///< 0: value, 1: rel_attr, 2: sub_qery, 3: value list, 4: expression
   Value              left_value;  ///< left-hand side value if left_is_attr = FALSE
   RelAttrSqlNode     left_attr;   ///< left-hand side attribute
   ParsedSqlNode     *left_sub_query;
   std::vector<Value> left_value_list;
+  Expression        *left_expr = nullptr;
 
   int right_is_attr;               ///< TRUE if right-hand side is an attribute
                                    ///< 1时，操作符左边是属性名，0时，是属性值
-                                   ///< 0: value, 1: rel_attr, 2: sub_qery
+                                   ///< 0: value, 1: rel_attr, 2: sub_qery 3: value list 4: expression
   RelAttrSqlNode     right_attr;   ///< right-hand side attribute if right_is_attr = TRUE 右边的属性
   Value              right_value;  ///< right-hand side value if right_is_attr = FALSE
   ParsedSqlNode     *right_sub_query;
   std::vector<Value> right_value_list;
+  Expression        *right_expr = nullptr;
 
-  int                link_type = 0;  ///< 该条件跟其他条件的链接方式， 0 (default)：AND连接， 1：OR连接     
+  int link_type = 0;  ///< 该条件跟其他条件的链接方式， 0 (default)：AND连接， 1：OR连接
 };
 
 /**
@@ -147,14 +149,14 @@ struct JoinSqlNode
 
 struct SelectSqlNode
 {
-  std::vector<RelAttrSqlNode>   attributes;  ///< attributes in select clause
-  std::vector<std::string>      relations;   ///< 查询的表
+  std::vector<Expression *>                attributes;  ///< attributes in select clause
+  std::vector<std::string>                 relations;   ///< 查询的表
   std::unordered_map<std::string, Table *> parent_query_tables;
-  std::vector<ConditionSqlNode> conditions;  ///< 查询条件，使用AND串联起来多个条件
-  std::vector<JoinSqlNode>      joinctions;  ///< join 条件
-  std::vector<OrderBySqlNode>   orderby;     ///< orderby 条件
-  std::vector<RelAttrSqlNode>   groupby;     ///< groupby 条件
-  std::vector<ConditionSqlNode> having;      ///< having 条件
+  std::vector<ConditionSqlNode>            conditions;  ///< 查询条件，使用AND串联起来多个条件
+  std::vector<JoinSqlNode>                 joinctions;  ///< join 条件
+  std::vector<OrderBySqlNode>              orderby;     ///< orderby 条件
+  std::vector<Expression *>                groupby;     ///< groupby 条件
+  std::vector<ConditionSqlNode>            having;      ///< having 条件
 };
 
 /**

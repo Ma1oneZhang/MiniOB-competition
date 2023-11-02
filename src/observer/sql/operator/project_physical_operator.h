@@ -31,11 +31,16 @@ public:
   void add_expressions(std::vector<std::unique_ptr<Expression>> &&expressions) {}
   void add_projection(const Table *table, const FieldMeta *field);
   void add_projection(const Table *table, Field &field);
+  void add_projection(Expression *expr);
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::PROJECT; }
 
   RC open(Trx *trx) override;
-  RC open() override {close(); return open(trx_);}
+  RC open() override
+  {
+    close();
+    return open(trx_);
+  }
   RC next() override;
   RC close() override;
 
@@ -46,5 +51,5 @@ public:
 private:
   ProjectTuple tuple_;
 
-  Trx         *trx_;
+  Trx *trx_;
 };

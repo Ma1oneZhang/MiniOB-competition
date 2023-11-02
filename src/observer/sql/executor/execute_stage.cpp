@@ -22,6 +22,8 @@ See the Mulan PSL v2 for more details. */
 #include "event/storage_event.h"
 #include "event/sql_event.h"
 #include "event/session_event.h"
+#include "sql/expr/tuple_cell.h"
+#include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/select_stmt.h"
 #include "storage/default/default_handler.h"
@@ -70,7 +72,11 @@ RC ExecuteStage::handle_request_with_physical_operator(SQLStageEvent *sql_event)
       bool        with_table_name = select_stmt->tables().size() > 1;
 
       for (const Field &field : select_stmt->query_fields()) {
-        if (with_table_name) {
+        if (field.is_expr()) {
+          schema.append_cell(field.expr());
+        } else if (field.get_aggr_type() != AggregationType::NONE) {
+          schema.append_cell(TupleCellSpec(field.table_name(), field.aggr_name(), field.aggr_name()));
+        } else if (with_table_name) {
           schema.append_cell(field.table_name(), field.field_name());
         } else {
           schema.append_cell(field.field_name());
