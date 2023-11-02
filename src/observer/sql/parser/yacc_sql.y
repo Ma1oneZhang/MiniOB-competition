@@ -75,6 +75,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         COUNT
         AVG
         SUM
+        ROUND
+        LENGTH
+        DATE_FORMAT
         INNER
         JOIN
         RBRACE
@@ -617,7 +620,15 @@ update_attr_list:
       $$->push_back(*$2);
     };
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM ID rel_list join_list where order_by group_by having
+    SELECT expression_list
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.attributes.swap(*$2);
+        delete $2;
+      }
+    }
+    | SELECT expression_list FROM ID rel_list join_list where order_by group_by having
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -705,6 +716,32 @@ expression:
     | rel_attr {
       $$ = new FieldExpr(*$1);
       delete $1; 
+    }
+    | ROUND LBRACE expression RBRACE
+    {
+      auto zero_value = Value(0);
+      $$ = new RoundFuncExpr($3, new ValueExpr(zero_value));
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | ROUND LBRACE expression COMMA expression RBRACE
+    {
+      $$ = new RoundFuncExpr($3, $5);
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | LENGTH LBRACE expression RBRACE
+    {
+      $$ = new LengthFuncExpr($3);
+      $$->set_name(token_name(sql_string, &@$));$$->set_name(token_name(sql_string, &@$));
+    } 
+    | DATE_FORMAT LBRACE expression COMMA expression RBRACE 
+    {
+      $$ = new DateFormatFuncExpr($3, $5);
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | expression ID 
+    {
+      $$ = $1;
+      $$->set_name($2);
     }
     ;
 
