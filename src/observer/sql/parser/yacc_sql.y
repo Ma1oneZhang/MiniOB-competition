@@ -997,6 +997,10 @@ condition:
       $$->left_is_attr = 4;
       $$->left_expr = $1;
       $$->comp = CompOp::IS_NULL;
+      $$->right_is_attr = 4;
+      auto null_value = Value();
+      null_value.set_isnull();
+      $$->right_expr = new ValueExpr(null_value);
     }
     | expression IS NOT NULL_TOKEN
     {
@@ -1004,6 +1008,9 @@ condition:
       $$->left_is_attr = 4;
       $$->left_expr = $1;
       $$->comp = CompOp::IS_NOT_NULL;
+      auto null_value = Value();
+      null_value.set_isnull();
+      $$->right_expr = new ValueExpr(null_value);
     }
     | LBRACE select_stmt RBRACE comp_op LBRACE select_stmt RBRACE
     {
