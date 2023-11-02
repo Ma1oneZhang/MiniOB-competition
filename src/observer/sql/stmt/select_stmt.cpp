@@ -422,15 +422,23 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
+  // all_tables contains tables in parent query
+  std::vector<Table *> all_tables(tables);
+  for (const auto &pair : select_sql.parent_query_tables) {
+    if (std::find(all_tables.begin(), all_tables.end(), pair.second) == all_tables.end()) {
+      all_tables.emplace_back(pair.second);
+    }
+  }
+
   for (auto &i : select_sql.conditions) {
     if (i.left_is_attr == 4) {
-      auto rc = i.left_expr->set_table_name(tables);
+      auto rc = i.left_expr->set_table_name(all_tables);
       if (OB_FAIL(rc)) {
         return rc;
       }
     }
     if (i.right_is_attr == 4) {
-      auto rc = i.right_expr->set_table_name(tables);
+      auto rc = i.right_expr->set_table_name(all_tables);
       if (OB_FAIL(rc)) {
         return rc;
       }
