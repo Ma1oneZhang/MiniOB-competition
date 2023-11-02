@@ -14,9 +14,6 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/log/log.h"
 #include "sql/operator/predicate_physical_operator.h"
-#include "storage/record/record.h"
-#include "sql/stmt/filter_stmt.h"
-#include "storage/field/field.h"
 #include "sql/expr/tuple.h"
 
 PredicatePhysicalOperator::PredicatePhysicalOperator(std::unique_ptr<Expression> expr) : expression_(std::move(expr))
