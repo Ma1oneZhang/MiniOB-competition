@@ -14,6 +14,8 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <cmath>
+#include <cstdio>
 #include <string.h>
 #include <memory>
 #include <string>
@@ -52,7 +54,11 @@ enum class ExprType
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
   SUB_QUERY,    ///< 子查询
-  VALUELIST     ///< 多个常量值
+  VALUELIST,    ///< 多个常量值
+  DATEFORMAT,   ///< date_format func
+  LENGTH,       ///< length func
+  ROUND,        ///< round func
+  ALIAS,        ///< alias
 };
 
 /**
@@ -94,7 +100,7 @@ public:
    * @details 一个表达式运算出结果后，只有一个值
    */
   virtual AttrType value_type() const = 0;
-
+  virtual bool     is_const_value() { return false; }
   /**
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
@@ -168,6 +174,7 @@ public:
     }
     return RC::NOTFOUND;
   }
+  virtual bool is_const_value() override { return false; }
 
 private:
   Field          field_;
@@ -200,6 +207,7 @@ public:
   void get_value(Value &value) const { value = value_; }
 
   const Value &get_value() const { return value_; }
+  virtual bool is_const_value() override { return true; }
 
 private:
   Value value_;
@@ -222,6 +230,7 @@ public:
   AttrType value_type() const override { return value_list_[0].attr_type(); }
 
   vector<Value> &get_valuelist() { return value_list_; }
+  virtual bool   is_const_value() override { return true; }
 
 private:
   vector<Value> value_list_;
@@ -284,6 +293,7 @@ public:
   AttrType value_type() const override { return cast_type_; }
 
   std::unique_ptr<Expression> &child() { return child_; }
+  virtual bool                 is_const_value() override { return child_->is_const_value(); }
 
 private:
   RC cast(const Value &value, Value &cast_value) const;
@@ -355,6 +365,7 @@ public:
     rc = right_->set_table_name(query_tables);
     return rc;
   }
+  virtual bool is_const_value() override { return left_->is_const_value() && right_->is_const_value(); }
 
 private:
   CompOp                      comp_;
@@ -417,6 +428,15 @@ public:
       }
     }
     return RC::SUCCESS;
+  }
+  virtual bool is_const_value() override
+  {
+    for (auto &expr : children_) {
+      if (!expr->is_const_value()) {
+        return false;
+      }
+    }
+    return true;
   }
 
 private:
@@ -486,6 +506,16 @@ public:
     }
     return rc;
   }
+  virtual bool is_const_value() override
+  {
+    if (!left_->is_const_value()) {
+      return false;
+    }
+    if (right_ && !right_->is_const_value()) {
+      return false;
+    }
+    return true;
+  }
 
 private:
   RC calc_value(const Value &left_value, const Value &right_value, Value &value) const;
@@ -494,4 +524,296 @@ private:
   Type                        arithmetic_type_;
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
+};
+
+class LengthFuncExpr : public Expression
+{
+public:
+  LengthFuncExpr(Expression *child) : child_(child) {}
+  virtual ~LengthFuncExpr() = default;
+
+  ExprType type() const override { return ExprType::LENGTH; }
+
+  AttrType value_type() const override { return AttrType::INTS; }
+
+  RC get_value(const Tuple &tuple, Value &value) override
+  {
+    auto rc = child_->get_value(tuple, value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    if (value.get_isnull()) {
+      value.set_int(0);
+      return RC::SUCCESS;
+    }
+    value.set_int(value.get_string().size());
+    return RC::SUCCESS;
+  };
+  RC try_get_value(Value &value) const override
+  {
+    auto rc = child_->try_get_value(value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    if (value.get_isnull()) {
+      value.set_int(0);
+      return RC::SUCCESS;
+    }
+    value.set_int(value.get_string().size());
+    return RC::SUCCESS;
+  }
+
+  Expression                         *child() { return child_; }
+  virtual std::vector<Field>          get_fields() override { return child_->get_fields(); }
+  virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override { return child_->get_rel_attr_sql_node(); };
+  virtual RC                          set_table_name(std::vector<Table *> &query_tables) override
+  {
+    return child_->set_table_name(query_tables);
+  }
+  virtual bool check_vaild()
+  {
+    return (child_->type() == ExprType::FIELD || child_->type() == ExprType::VALUE) &&
+           child_->value_type() == AttrType::CHARS;
+  }
+  virtual bool is_const_value() override { return child_->is_const_value(); }
+
+private:
+  Expression *child_;  // real value
+};
+
+class RoundFuncExpr : public Expression
+{
+public:
+  RoundFuncExpr(Expression *child, Expression *factor) : child_(child), factor_(factor) {}
+  virtual ~RoundFuncExpr() = default;
+
+  ExprType type() const override { return ExprType::ROUND; }
+
+  AttrType value_type() const override { return AttrType::INTS; }
+
+  RC get_value(const Tuple &tuple, Value &value) override
+  {
+    auto rc = child_->get_value(tuple, value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    if (value.get_isnull())
+      return RC::SUCCESS;
+    auto res = value.get_float();
+    rc       = factor_->get_value(tuple, value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    double factor = std::pow(10, value.get_int());
+    res           = roundl(res * factor) / factor;
+    value.set_float(res);
+    return RC::SUCCESS;
+  };
+
+  RC try_get_value(Value &value) const override
+  {
+    auto rc = child_->try_get_value(value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    if (value.get_isnull())
+      return RC::SUCCESS;
+    auto res = value.get_float();
+    rc       = factor_->try_get_value(value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    double factor = std::pow(10, value.get_int());
+    res           = roundl(res * factor) / factor;
+    value.set_float(res);
+    return RC::SUCCESS;
+  };
+
+  Expression *child() { return child_; }
+
+  virtual std::vector<Field>          get_fields() override { return child_->get_fields(); }
+  virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override { return child_->get_rel_attr_sql_node(); };
+  virtual RC                          set_table_name(std::vector<Table *> &query_tables) override
+  {
+    return child_->set_table_name(query_tables);
+  }
+  virtual bool check_vaild()
+  {
+    return (child_->type() == ExprType::FIELD || child_->type() == ExprType::VALUE) &&
+           child_->value_type() == AttrType::FLOATS &&
+           (factor_->type() == ExprType::VALUE && factor_->value_type() == AttrType::INTS);
+  }
+  virtual bool is_const_value() override { return child_->is_const_value() && factor_->is_const_value(); }
+
+private:
+  Expression *child_;   // real value
+  Expression *factor_;  // length
+};
+
+class DateFormatFuncExpr : public Expression
+{
+public:
+  DateFormatFuncExpr(Expression *child, Expression *format) : child_(child), format_(format) {}
+  virtual ~DateFormatFuncExpr() = default;
+
+  ExprType type() const override { return ExprType::DATEFORMAT; }
+
+  AttrType value_type() const override { return AttrType::INTS; }
+
+  RC get_value(const Tuple &tuple, Value &value) override
+  {
+    auto rc = child_->get_value(tuple, value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    if (value.get_isnull())
+      return RC::SUCCESS;
+    if (!value.match_field_type(AttrType::DATES)) {
+      return RC::INVALID_ARGUMENT;
+    }
+    auto res = value.get_string();
+    rc       = format_->get_value(tuple, value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    auto format = value.get_string();
+    int  y, m, d;
+    sscanf(res.c_str(), "%d-%d-%d", &y, &m, &d);
+    res = apply_format(y, m, d, format);
+    value.set_string(res.c_str(), res.size());
+    return RC::SUCCESS;
+  }
+
+  RC try_get_value(Value &value) const override
+  {
+    auto rc = child_->try_get_value(value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    if (value.get_isnull())
+      return RC::SUCCESS;
+    if (!value.match_field_type(AttrType::DATES)) {
+      return RC::INVALID_ARGUMENT;
+    }
+    auto res = value.get_string();
+    rc       = format_->try_get_value(value);
+    if (OB_FAIL(rc)) {
+      return rc;
+    }
+    auto format = value.get_string();
+    int  y, m, d;
+    sscanf(res.c_str(), "%d-%d-%d", &y, &m, &d);
+    res = "";
+    return RC::SUCCESS;
+  }
+
+  static std::string apply_format(int year, int mouth, int day, std::string_view format)
+  {
+    constexpr const char *month_name[] = {"January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"};
+    constexpr const char *day_name[]   = {"1st",
+          "2nd",
+          "3rd",
+          "4th",
+          "5th",
+          "6th",
+          "7th",
+          "8th",
+          "9th",
+          "10th",
+          "11th",
+          "12th",
+          "13th",
+          "14th",
+          "15th",
+          "16th",
+          "17th",
+          "18th",
+          "19th",
+          "20th",
+          "21st",
+          "22nd",
+          "23rd",
+          "24th",
+          "25th",
+          "26th",
+          "27th",
+          "28th",
+          "29th",
+          "30th",
+          "31st"};
+    std::string           result;
+    for (int i = 0; i < format.size(); i++) {
+      if (format[i] == '%' && i + 1 < format.size()) {
+        switch (format[i + 1]) {
+          case 'Y': {
+            result += std::to_string(year);
+          } break;
+          case 'y': {
+            auto t = year % 100;
+            if (t < 10)
+              result += '0' + std::to_string(t);
+            else
+              result += std::to_string(t);
+          } break;
+          case 'M': {
+            result += month_name[mouth - 1];
+          } break;
+          case 'm': {
+            if (mouth < 10)
+              result += '0' + std::to_string(mouth);
+            else
+              result += std::to_string(mouth);
+          } break;
+          case 'D': {
+            result += day_name[day - 1];
+          } break;
+          case 'd': {
+            if (day < 10)
+              result += '0' + std::to_string(day);
+            else
+              result += std::to_string(day);
+          } break;
+          default: {
+            result += format[i];
+            result += format[i + 1];
+          }
+        }
+        i++;
+      } else {
+        result += format[i];
+      }
+    }
+    return result;
+  }
+
+  Expression *child() { return child_; }
+
+  virtual std::vector<Field>          get_fields() override { return child_->get_fields(); }
+  virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override { return child_->get_rel_attr_sql_node(); };
+  virtual RC                          set_table_name(std::vector<Table *> &query_tables) override
+  {
+    return child_->set_table_name(query_tables);
+  }
+  virtual bool check_vaild()
+  {
+    return (child_->type() == ExprType::FIELD || child_->type() == ExprType::VALUE) &&
+           child_->value_type() == AttrType::DATES &&
+           (format_->type() == ExprType::VALUE && format_->value_type() == AttrType::CHARS);
+  }
+  virtual bool is_const_value() override { return child_->is_const_value(); }
+
+private:
+  Expression *child_;   // real value
+  Expression *format_;  // format
 };
