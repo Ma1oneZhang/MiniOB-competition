@@ -98,10 +98,10 @@ public:
   /**
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
-  virtual std::string                 name() const { return name_; }
-  virtual void                        set_name(std::string name) { name_ = name; }
-  virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() { return {}; }
-
+  virtual std::string                      name() const { return name_; }
+  virtual void                             set_name(std::string name) { name_ = name; }
+  virtual std::vector<RelAttrSqlNode>      get_rel_attr_sql_node() { return {}; }
+  virtual std::vector<Field>               get_fields() { return {}; }
   std::unordered_map<std::string, Tuple *> get_parent_query_tuples() { return parent_query_tuples_; };
   RC set_parent_query_tuples(unordered_map<std::string, Tuple *> parent_query_tuples)
   {
@@ -141,15 +141,16 @@ public:
 
   const char                         *field_name() const { return field_.field_name(); }
   virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override { return {sql_node_}; }
-
-  RC              get_value(const Tuple &tuple, Value &value) override;
-  RelAttrSqlNode &get_sql_node() { return sql_node_; }
-  virtual RC      set_table_name(std::vector<Table *> &query_tables) override
+  virtual std::vector<Field>          get_fields() override { return {field_}; }
+  RC                                  get_value(const Tuple &tuple, Value &value) override;
+  RelAttrSqlNode                     &get_sql_node() { return sql_node_; }
+  virtual RC                          set_table_name(std::vector<Table *> &query_tables) override
   {
     if (sql_node_.relation_name != "") {
       for (auto table : query_tables) {
         if (table->name() == sql_node_.relation_name) {
-          field_ = Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()));
+          field_ =
+              Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()), sql_node_.aggregation_type);
           return RC::SUCCESS;
         }
       }
@@ -159,7 +160,8 @@ public:
       }
       for (auto table : query_tables) {
         if (table->table_meta().field(sql_node_.attribute_name.c_str())) {
-          field_ = Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()));
+          field_ =
+              Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()), sql_node_.aggregation_type);
           return RC::SUCCESS;
         }
       }
@@ -328,13 +330,20 @@ public:
 
   RC compare_valuelist(const Value &left, const Value &right, bool &value) const;
 
-  RC like_operation(const Value &left, const Value &right, bool &value, bool do_like) const;
+  RC                         like_operation(const Value &left, const Value &right, bool &value, bool do_like) const;
+  virtual std::vector<Field> get_fields() override
+  {
+    auto l = left_->get_fields();
+    auto r = right_->get_fields();
+    l.insert(l.end(), r.begin(), r.end());
+    return l;
+  }
   virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override
   {
     auto l = left_->get_rel_attr_sql_node();
     auto r = right_->get_rel_attr_sql_node();
     l.insert(l.end(), r.begin(), r.end());
-    return r;
+    return l;
   };
 
   virtual RC set_table_name(std::vector<Table *> &query_tables) override
@@ -381,7 +390,15 @@ public:
   Type conjunction_type() const { return conjunction_type_; }
 
   std::vector<std::unique_ptr<Expression>> &children() { return children_; }
-
+  virtual std::vector<Field>                get_fields() override
+  {
+    std::vector<Field> result;
+    for (auto &expr : children_) {
+      auto child_field = expr->get_fields();
+      result.insert(result.end(), child_field.begin(), child_field.end());
+    }
+    return result;
+  }
   virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override
   {
     std::vector<RelAttrSqlNode> sql_nodes;
@@ -437,8 +454,18 @@ public:
 
   Type arithmetic_type() const { return arithmetic_type_; }
 
-  std::unique_ptr<Expression>        &left() { return left_; }
-  std::unique_ptr<Expression>        &right() { return right_; }
+  std::unique_ptr<Expression> &left() { return left_; }
+  std::unique_ptr<Expression> &right() { return right_; }
+
+  virtual std::vector<Field> get_fields() override
+  {
+    auto l = left_->get_fields();
+    if (right_) {
+      auto r = right_->get_fields();
+      l.insert(l.end(), r.begin(), r.end());
+    }
+    return l;
+  }
   virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override
   {
     auto l = left_->get_rel_attr_sql_node();

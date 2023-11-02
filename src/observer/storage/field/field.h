@@ -68,11 +68,8 @@ public:
   AttrType attr_type() const { return field_->type(); }
 
   const char *table_name() const { return table_->name(); }
-  const char *field_name() const
-  {
-    return (AggregationType::NONE == aggregation_ && aggr_field_name_ != "COUNT(*)") ? field_->name()
-                                                                                     : aggr_field_name_.c_str();
-  }
+  const char *field_name() const { return field_->name(); }
+  const char *aggr_name() const { return aggr_field_name_.c_str(); }
 
   void set_table(const Table *table) { this->table_ = table; }
   void set_field(const FieldMeta *field) { this->field_ = field; }

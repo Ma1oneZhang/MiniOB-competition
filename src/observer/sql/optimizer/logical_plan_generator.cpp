@@ -102,8 +102,16 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   bool               aggr = false;
   for (Table *table : tables) {
     for (const Field &field : all_fields) {
+      
       if (field.get_aggr_type() != AggregationType::NONE) {
         aggr = true;
+      } else if (field.is_expr()) {
+        for (auto i : field.expr()->get_fields()) {
+          if (i.get_aggr_type() != AggregationType::NONE) {
+            aggr = true;
+            break;
+          }
+        }
       }
       // count(*)
       if (field.get_aggr_type() == AggregationType::COUNT && field.table() == nullptr) {
@@ -131,6 +139,15 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   if (aggr) {
     auto fields_ = fields;
+    for (auto i : all_fields) {
+      if(i.is_expr()){
+        for (auto j : i.expr()->get_fields()) {
+          if (j.get_aggr_type() != AggregationType::NONE) {
+            fields_.push_back(j);
+          }
+        }
+      }
+    }
     fields_.insert(fields_.begin(), select_stmt->having().begin(), select_stmt->having().end());
     unique_ptr<LogicalOperator> aggr_oper(new AggregationLogicalOperator(fields_, group_by));
     aggregation_oper.swap(aggr_oper);

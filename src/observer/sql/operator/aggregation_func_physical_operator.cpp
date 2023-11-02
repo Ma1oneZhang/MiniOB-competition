@@ -130,7 +130,7 @@ RC AggregationPhysicalOperator::next()
 
   // get aggr result
   for (size_t i = 0; i < aggr_fields_.size(); i++) {
-    TupleCellSpec spec{aggr_fields_[i].table_name(), aggr_fields_[i].field_name(), aggr_fields_[i].field_name()};
+    TupleCellSpec spec{aggr_fields_[i].table_name(), aggr_fields_[i].field_name(), aggr_fields_[i].aggr_name()};
     tuple_ptr->add_cell_spec(spec);
     const auto &aggr_result = iters_.at(pos_of_map)->second.second;
     switch (aggr_fields_[i].get_aggr_type()) {
