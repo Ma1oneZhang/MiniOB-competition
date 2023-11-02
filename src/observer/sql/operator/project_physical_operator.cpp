@@ -22,6 +22,15 @@ See the Mulan PSL v2 for more details. */
 RC ProjectPhysicalOperator::open(Trx *trx)
 {
   trx_ = trx;
+
+  for (int i = 0; i < tuple_.cell_num(); i++) {
+    TupleCellSpec *spec = nullptr;
+    tuple_.cell_spec_at(i, spec);
+    if (!spec->is_expr() || !spec->expr()->is_const_value()) {
+      is_all_constant_ = false;
+    }
+  }
+
   if (children_.empty()) {
     return RC::SUCCESS;
   }
@@ -32,15 +41,6 @@ RC ProjectPhysicalOperator::open(Trx *trx)
     LOG_WARN("failed to open child operator: %s", strrc(rc));
     return rc;
   }
-
-  for (int i = 0; i < tuple_.cell_num(); i++) {
-    TupleCellSpec *spec = nullptr;
-    tuple_.cell_spec_at(i, spec);
-    if (!spec->is_expr() || !spec->expr()->is_const_value()) {
-      is_all_constant_ = false;
-    }
-  }
-
   return RC::SUCCESS;
 }
 

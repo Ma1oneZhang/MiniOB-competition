@@ -613,7 +613,8 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value)
   left_->set_parent_query_tuples(get_parent_query_tuples());
   right_->set_parent_query_tuples(get_parent_query_tuples());
 
-  if (left_->type() == ExprType::VALUE || left_->type() == ExprType::FIELD || left_->type() == ExprType::ARITHMETIC) {
+  if (left_->type() == ExprType::VALUE || left_->type() == ExprType::FIELD || left_->type() == ExprType::ARITHMETIC ||
+      left_->type() == ExprType::LENGTH || left_->type() == ExprType::ROUND || left_->type() == ExprType::DATEFORMAT) {
     rc = left_->get_value(tuple, left_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
@@ -622,7 +623,8 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value)
   }
 
   if (right_->type() == ExprType::VALUE || right_->type() == ExprType::FIELD ||
-      right_->type() == ExprType::ARITHMETIC) {
+      right_->type() == ExprType::ARITHMETIC || right_->type() == ExprType::LENGTH ||
+      right_->type() == ExprType::ROUND || right_->type() == ExprType::DATEFORMAT) {
     rc = right_->get_value(tuple, right_value);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));

@@ -50,7 +50,9 @@ public:
 
 private:
   ProjectTuple tuple_;
-  bool         is_all_constant_ = true;
-  bool         is_executed_     = false;
   Trx         *trx_;
+
+  bool is_all_constant_first_ = false;
+  bool is_all_constant_       = true;
+  bool is_executed_           = false;
 };
