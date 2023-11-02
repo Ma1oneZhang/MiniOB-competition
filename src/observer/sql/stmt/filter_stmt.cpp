@@ -131,13 +131,6 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
         LOG_WARN("cannot find attr");
         return rc;
       }
-      if (field->type() == AttrType::DATES && (comp != CompOp::IS_NOT_NULL && comp != CompOp::IS_NULL)) {
-        auto value  = condition.right_value;
-        auto status = value.match_field_type(AttrType::DATES);
-        if (!status) {
-          return RC::INVALID_ARGUMENT;
-        }
-      }
       if ((comp == LIKE_OP || comp == NOT_LIKE_OP) && field->type() != AttrType::CHARS) {
         return RC::INVALID_ARGUMENT;
       }
