@@ -139,7 +139,7 @@ public:
 
   const char *table_name() const { return field_.table_name(); }
 
-  const char                         *field_name() const { return field_.field_name(); }
+  const char *field_name() const { return field_.meta() == nullptr ? "COUNT(*)" : field_.field_name(); }
   virtual std::vector<RelAttrSqlNode> get_rel_attr_sql_node() override { return {sql_node_}; }
   virtual std::vector<Field>          get_fields() override { return {field_}; }
   RC                                  get_value(const Tuple &tuple, Value &value) override;
