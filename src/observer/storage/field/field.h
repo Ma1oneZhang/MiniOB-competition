@@ -68,13 +68,40 @@ public:
   AttrType attr_type() const { return field_->type(); }
 
   const char *table_name() const { return table_->name(); }
-  const char *field_name() const { return field_->name(); }
+  const char *field_name() const 
+  { 
+    if (has_alias_) 
+      return alias_.c_str();
+    else
+      return field_->name(); 
+  }
+
+  const char *table_alias_or_name() const
+  {
+    if (table_->table_meta().alias() != "") {
+      return table_->table_meta().alias();
+    } else {
+      return table_->name();
+    }
+  }
+
   const char *aggr_name() const { return aggr_field_name_.c_str(); }
 
   void set_table(const Table *table) { this->table_ = table; }
   void set_field(const FieldMeta *field) { this->field_ = field; }
   void set_int(Record &record, int value);
   void set_aggr_type(AggregationType type) { this->aggregation_ = type; }
+
+  bool has_alias() const { return has_alias_; }
+
+  RC   set_alias(const char *alias)
+  {
+    has_alias_ = true;
+    alias_     = alias;
+    return RC::SUCCESS;
+  }
+
+  const char *alias() const { return alias_.c_str(); }
 
   AggregationType get_aggr_type() const { return aggregation_; }
   int             get_int(const Record &record);
@@ -90,4 +117,6 @@ private:
   std::string      aggr_field_name_;
   AggregationType  aggregation_ = AggregationType::NONE;
   Expression      *expr_        = nullptr;
+  bool             has_alias_   = false;
+  std::string      alias_;
 };

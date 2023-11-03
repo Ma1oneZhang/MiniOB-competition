@@ -120,6 +120,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         LE
         GE
         NE
+        AS
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -143,6 +144,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   std::vector<RelAttrSqlNode> *     rel_attr_list;
   std::vector<OrderBySqlNode> *     order_by_attr_list;
   std::vector<std::string> *        relation_list;
+  std::vector<std::vector<std::string>> *        relation_alias_list;
   std::vector<JoinSqlNode> *        join_list;
   char *                            string;
   int                               number;
@@ -172,9 +174,9 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <tuple_list>          tuple_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
-%type <relation_list>       rel_list
+%type <relation_alias_list> rel_list
 %type <expression_list>     attr_list
-%type <expression_list>       group_by
+%type <expression_list>     group_by
 %type <condition_list>      having
 %type <condition_list>      having_list
 %type <condition>           having_attr
@@ -636,11 +638,14 @@ select_stmt:        /*  select 语句的语法解析树*/
         delete $2;
       }
       if ($5 != nullptr) {
-        $$->selection.relations.swap(*$5);
+        $$->selection.relations.swap($5->front());
+        $$->selection.relation_alias.swap($5->back());
         delete $5;
       }
-      $$->selection.relations.push_back($4);
+      $$->selection.relations.emplace_back($4);
+      $$->selection.relation_alias.emplace_back("");
       std::reverse($$->selection.relations.begin(), $$->selection.relations.end());
+      std::reverse($$->selection.relation_alias.begin(), $$->selection.relation_alias.end());
       if ($6 != nullptr) {
         $$->selection.joinctions.swap(*$6);
         delete $6;
@@ -660,6 +665,81 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.having.swap(*$10);
       }
       free($4);
+    }
+    | SELECT expression_list FROM ID AS ID rel_list join_list where order_by group_by having
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.attributes.swap(*$2);
+        delete $2;
+      }
+      if ($7 != nullptr) {
+        $$->selection.relations.swap($7->front());
+        $$->selection.relation_alias.swap($7->back());
+        delete $7;
+      }
+      $$->selection.relations.emplace_back($4);
+      $$->selection.relation_alias.emplace_back($6);
+      std::reverse($$->selection.relations.begin(), $$->selection.relations.end());
+      std::reverse($$->selection.relation_alias.begin(), $$->selection.relation_alias.end());
+      if ($8 != nullptr) {
+        $$->selection.joinctions.swap(*$8);
+        delete $8;
+      }
+      if ($9 != nullptr) {
+        $$->selection.conditions.swap(*$9);
+        delete $9;
+      }
+      if ($10 != nullptr) {
+        $$->selection.orderby.swap(*$10);
+        delete $10;
+      }
+      if ($11 != nullptr){
+        $$->selection.groupby.swap(*$11);
+      }
+      if ($12 != nullptr){
+        $$->selection.having.swap(*$12);
+      }
+      free($4);
+      free($6);
+    }
+    | SELECT expression_list FROM ID ID rel_list join_list where order_by group_by having
+    {
+      $$ = new ParsedSqlNode(SCF_SELECT);
+      if ($2 != nullptr) {
+        $$->selection.attributes.swap(*$2);
+        delete $2;
+      }
+      if ($6 != nullptr) {
+        $$->selection.relations.swap($6->front());
+        $$->selection.relation_alias.swap($6->back());
+        delete $6;
+      }
+
+      $$->selection.relations.emplace_back($4);
+      $$->selection.relation_alias.emplace_back($5);
+      std::reverse($$->selection.relations.begin(), $$->selection.relations.end());
+      std::reverse($$->selection.relation_alias.begin(), $$->selection.relation_alias.end());
+      if ($7 != nullptr) {
+        $$->selection.joinctions.swap(*$7);
+        delete $7;
+      }
+      if ($8 != nullptr) {
+        $$->selection.conditions.swap(*$8);
+        delete $9;
+      }
+      if ($9 != nullptr) {
+        $$->selection.orderby.swap(*$9);
+        delete $9;
+      }
+      if ($10 != nullptr){
+        $$->selection.groupby.swap(*$10);
+      }
+      if ($11 != nullptr){
+        $$->selection.having.swap(*$11);
+      }
+      free($4);
+      free($5);
     }
     ;
 calc_stmt:
@@ -743,6 +823,11 @@ expression:
       $$ = $1;
       $$->set_name($2);
     }
+    | expression AS ID 
+    {
+      $$ = $1;
+      $$->set_name($3);
+    }
     ;
 
 rel_attr:
@@ -750,6 +835,12 @@ rel_attr:
       $$ = new RelAttrSqlNode;
       $$->relation_name  = "";
       $$->attribute_name = "*";;
+    }
+    | ID DOT '*' {
+      $$ = new RelAttrSqlNode;
+      $$->relation_name  = $1;
+      $$->attribute_name = "*";
+      free($1);
     }
     | ID {
       $$ = new RelAttrSqlNode;
@@ -814,11 +905,44 @@ rel_list:
       if ($3 != nullptr) {
         $$ = $3;
       } else {
-        $$ = new std::vector<std::string>;
+        $$ = new std::vector<std::vector<std::string>>();
+        $$->emplace_back();
+        $$->emplace_back();
       }
 
-      $$->push_back($2);
+      $$->front().emplace_back($2);
+      $$->back().emplace_back("");
       free($2);
+    }
+    | COMMA ID AS ID rel_list {
+      if ($5 != nullptr) {
+        $$ = $5;
+      } else {
+        $$ = new std::vector<std::vector<std::string>>();
+        $$->emplace_back();
+        $$->emplace_back();
+      }
+
+      $$->front().emplace_back($2);
+      $$->back().emplace_back($4);
+
+      free($2);
+      free($4);
+    }
+    | COMMA ID ID rel_list {
+      if ($4 != nullptr) {
+        $$ = $4;
+      } else {
+        $$ = new std::vector<std::vector<std::string>>();
+        $$->emplace_back();
+        $$->emplace_back();
+      }
+
+      $$->front().emplace_back($2);
+      $$->back().emplace_back($3);
+
+      free($2);
+      free($3);
     }
     ;
 

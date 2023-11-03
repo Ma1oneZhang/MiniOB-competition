@@ -94,6 +94,9 @@ public:
   int32_t     table_id() const { return table_meta_.table_id(); }
   const char *name() const;
 
+  RC set_alias(const char* alias) { return table_meta_.set_alias(alias); }
+  const char *alias() const;
+
   const TableMeta &table_meta() const;
 
   RC sync();

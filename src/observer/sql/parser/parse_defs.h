@@ -151,6 +151,7 @@ struct SelectSqlNode
 {
   std::vector<Expression *>                attributes;  ///< attributes in select clause
   std::vector<std::string>                 relations;   ///< 查询的表
+  std::vector<std::string>                 relation_alias;  ///< 查询的表的别称
   std::unordered_map<std::string, Table *> parent_query_tables;
   std::vector<ConditionSqlNode>            conditions;  ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>                 joinctions;  ///< join 条件
