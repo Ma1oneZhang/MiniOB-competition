@@ -205,6 +205,8 @@ public:
 
   const char *get_table_name() { return table_->name(); }
 
+  const Table *get_table() { return table_; }
+
 private:
   Record                 record_{};
   const Table           *table_ = nullptr;

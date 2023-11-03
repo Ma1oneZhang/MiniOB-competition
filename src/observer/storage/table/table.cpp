@@ -313,6 +313,8 @@ RC Table::recover_insert_record(Record &record)
 
 const char *Table::name() const { return table_meta_.name(); }
 
+const char *Table::alias() const { return table_meta_.alias(); }
+
 const TableMeta &Table::table_meta() const { return table_meta_; }
 
 RC Table::make_record(int value_num, const Value *values, Record &record)

@@ -40,10 +40,12 @@ public:
 
   RC add_index(const IndexMeta &index);
   RC remove_index(const IndexMeta &index);
+  RC set_alias(const char *alias) { alias_ = alias; return RC::SUCCESS; }
 
 public:
   int32_t                       table_id() const { return table_id_; }
   const char                   *name() const;
+  const char                   *alias() const;
   const FieldMeta              *trx_field() const;
   const FieldMeta              *field(int index) const;
   const FieldMeta              *field(const char *name) const;
@@ -74,6 +76,7 @@ public:
 protected:
   int32_t                table_id_ = -1;
   std::string            name_;
+  std::string            alias_;
   std::vector<FieldMeta> fields_;  // 包含sys_fields
   std::vector<IndexMeta> indexes_;
 

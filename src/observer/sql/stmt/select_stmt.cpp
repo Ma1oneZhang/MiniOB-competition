@@ -79,6 +79,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   // check sql relations
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     auto &table_name = select_sql.relations[i];
+    auto &table_alias = select_sql.relation_alias[i];
     if ("" == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -90,10 +91,20 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
+    // set table alias
+    table->set_alias(table_alias.data());
+
     if (std::find(tables.begin(), tables.end(), table) == tables.end()) {
       tables.emplace_back(table);
     }
     table_map[table_name] = table;
+    if (table_alias != ""){
+      if (table_map.count(table_alias) == 0){
+        table_map[table_alias] = table;
+      } else {
+        return RC::REPEAT_ALIAS;
+      }
+    }
   }
   // add the join's table to the tables
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
@@ -116,7 +127,7 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
   }
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
-  auto               checker = [&](RelAttrSqlNode &relation_attr, bool is_query_field) {
+  auto               checker = [&](Expression* expr, RelAttrSqlNode &relation_attr, bool is_query_field) {
     if (relation_attr.aggregation_type != AggregationType::NONE) {
       // aggregation function
       if (select_sql.orderby.size() != 0) {
@@ -129,11 +140,12 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
         if (relation_attr.aggregation_type != AggregationType::COUNT) {
           return RC::SCHEMA_FIELD_TYPE_MISMATCH;
         } else {
-          if (tables.size() != 1) {
-            return RC::SCHEMA_FIELD_NOT_EXIST;
-          }
           if (is_query_field) {
-            query_fields.push_back(Field(*tables.begin(), nullptr, AggregationType::COUNT));
+            Field field = Field(*tables.begin(), nullptr, AggregationType::COUNT);
+            if(expr->has_name()) {
+              field.set_alias((expr->name()).data());
+            }
+            query_fields.push_back(field);
           }
         }
       } else if (!common::is_blank(relation_attr.relation_name.c_str())) {
@@ -150,6 +162,9 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
             return RC::SCHEMA_FIELD_TYPE_MISMATCH;
           } else {
             Field aggr_field;
+            if(expr->has_name()) {
+              aggr_field.set_alias((expr->name()).data());
+            }
             aggr_field.set_aggr_type(AggregationType::COUNT);
             aggr_field.set_table(table_map[table_name]);
             if (is_query_field) {
@@ -170,6 +185,9 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
               return RC::SCHEMA_FIELD_TYPE_MISMATCH;
             } else {
               Field aggr_field;
+              if(expr->has_name()) {
+                aggr_field.set_alias((expr->name()).data());
+              }
               aggr_field.set_table(table);
               aggr_field.set_aggr_type(AggregationType::COUNT);
               if (is_query_field) {
@@ -183,7 +201,11 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
               return RC::SCHEMA_FIELD_MISSING;
             }
             if (is_query_field) {
-              query_fields.push_back(Field(table, field_meta, relation_attr.aggregation_type));
+              Field field = Field(table, field_meta, relation_attr.aggregation_type);
+              if(expr->has_name()) {
+                field.set_alias((expr->name()).data());
+              }
+              query_fields.push_back(field);
             }
           }
         }
@@ -200,7 +222,11 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
           return RC::SCHEMA_FIELD_MISSING;
         }
         if (is_query_field) {
-          query_fields.push_back(Field(table, field_meta, relation_attr.aggregation_type));
+          Field field = Field(table, field_meta, relation_attr.aggregation_type);
+          if(expr->has_name()) {
+            field.set_alias((expr->name()).data());
+          }
+          query_fields.push_back(field);
         }
       }
     } else {
@@ -208,6 +234,13 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       // check if the relation_attr is valid
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
           0 == strcmp(relation_attr.attribute_name.c_str(), "*")) {
+        if(expr->has_name()) {
+          if (tables.size() != 1) {
+            return RC::MULTI_ROW_RETURN;
+          } else if (tables[0]->table_meta().field_num() != 1) {
+            return RC::MULTI_ROW_RETURN;
+          }
+        }
         for (Table *table : tables) {
           if (is_query_field) {
             wildcard_fields(table, query_fields);
@@ -236,6 +269,10 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
 
           Table *table = iter->second;
           if (0 == strcmp(field_name, "*")) {
+            if (expr->has_name()) {
+              if (table->table_meta().field_num() != 1)
+                return RC::SCHEMA_FIELD_MISSING;
+            }
             if (is_query_field) {
               wildcard_fields(table, query_fields);
             }
@@ -269,24 +306,32 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
     }
     return RC::SUCCESS;
   };
+  
   for (auto expr : select_sql.attributes) {
     auto rc = expr->set_table_name(tables);
     if (OB_FAIL(rc)) {
       return rc;
     }
   }
+  
   for (int i = static_cast<int>(select_sql.attributes.size()) - 1; i >= 0; i--) {
     if (select_sql.attributes[i]->type() == ExprType::FIELD) {
-      auto field_expr = static_cast<FieldExpr *>(select_sql.attributes[i]);
-      auto rc         = checker(field_expr->get_sql_node(), true);
-      if (rc != RC::SUCCESS) {
-        return rc;
+      FieldExpr * field_expr = static_cast<FieldExpr *>(select_sql.attributes[i]);
+      string relation_name = field_expr->get_sql_node().relation_name;
+      string attribute_name = field_expr->get_sql_node().attribute_name;
+      if (attribute_name != "*"){  // the field has been created when set_table_name
+        query_fields.emplace_back(field_expr->field());
+      } else {
+        auto rc = checker(field_expr, field_expr->get_sql_node(), true);
+        if (rc != RC::SUCCESS) {
+          return rc;
+        }
       }
     } else {
       // 递归获取所需表达式字段
       auto fields = select_sql.attributes[i]->get_rel_attr_sql_node();
       for (auto &field : fields) {
-        auto rc = checker(field, false);
+        auto rc = checker(select_sql.attributes[i], field, false);
         if (rc != RC::SUCCESS) {
           return rc;
         }
