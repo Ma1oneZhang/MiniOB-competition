@@ -187,6 +187,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
 %type <join_node>           join_node
 %type <join_list>           join_list
 %type <expression>          expression
+%type <expression>          alias_expression
 %type <expression_list>     expression_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
@@ -795,7 +796,21 @@ calc_stmt:
     ;
 
 expression_list:
-    expression
+    alias_expression
+    {
+      $$ = new std::vector<Expression*>;
+      $$->emplace_back($1);
+    }
+    | alias_expression COMMA expression_list
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<Expression *>;
+      }
+      $$->emplace_back($1);
+    }
+    | expression
     {
       $$ = new std::vector<Expression*>;
       $$->emplace_back($1);
@@ -810,6 +825,20 @@ expression_list:
       $$->emplace_back($1);
     }
     ;
+
+alias_expression:
+     expression ID 
+    {
+      $$ = $1;
+      $$->set_name($2);
+    }
+    | expression AS ID 
+    {
+      $$ = $1;
+      $$->set_name($3);
+    }
+    ;
+
 expression:
     expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
@@ -859,18 +888,7 @@ expression:
     {
       $$ = new DateFormatFuncExpr($3, $5);
       $$->set_name(token_name(sql_string, &@$));
-    }
-    | expression ID 
-    {
-      $$ = $1;
-      $$->set_name($2);
-    }
-    | expression AS ID 
-    {
-      $$ = $1;
-      $$->set_name($3);
-    }
-    ;
+    };
 
 rel_attr:
     '*' {

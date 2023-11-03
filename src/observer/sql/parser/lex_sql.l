@@ -112,7 +112,6 @@ BY                                      RETURN_TOKEN(BY);
 HAVING                                  RETURN_TOKEN(HAVING);
 GROUP                                   RETURN_TOKEN(GROUP);                            
 ASC                                     RETURN_TOKEN(ASC);
-AS                                      RETURN_TOKEN(AS);
 DESC                                    RETURN_TOKEN(DESC);
 LIKE                                    RETURN_TOKEN(LIKE);
 NOT                                     RETURN_TOKEN(NOT);
