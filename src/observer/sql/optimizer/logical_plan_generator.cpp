@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/optimizer/logical_plan_generator.h"
 
+#include "common/rc.h"
 #include "sql/operator/aggregation_func_logical_operator.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
@@ -30,6 +31,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/value.h"
+#include "sql/stmt/create_table_stmt.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/select_stmt.h"
@@ -75,6 +77,16 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
       UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
       rc                      = create_plan(update_stmt, logical_operator);
     } break;
+    case StmtType::CREATE_TABLE: {
+      CreateTableStmt *create_table_stmt = static_cast<CreateTableStmt *>(stmt);
+      if (create_table_stmt->with_select()) {
+        rc = create_plan(create_table_stmt->get_select_stmt(), create_table_stmt->get_logical_operator());
+        if (OB_FAIL(rc)) {
+          return rc;
+        }
+      }
+      return RC::UNIMPLENMENT;
+    } break;
     default: {
       rc = RC::UNIMPLENMENT;
     }
@@ -102,7 +114,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   bool               aggr = false;
   for (Table *table : tables) {
     for (const Field &field : all_fields) {
-      
+
       if (field.get_aggr_type() != AggregationType::NONE) {
         aggr = true;
       } else if (field.is_expr()) {
@@ -123,7 +135,8 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     }
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, fields, true /*readonly*/));
     for (const Field &field : all_fields) {
-      if (!field.is_expr() && 0 == strcmp(field.table_name(), table->name()) && field.get_aggr_type() == AggregationType::NONE) {
+      if (!field.is_expr() && 0 == strcmp(field.table_name(), table->name()) &&
+          field.get_aggr_type() == AggregationType::NONE) {
         group_by.push_back(field);
       }
     }
@@ -140,7 +153,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   if (aggr) {
     auto fields_ = fields;
     for (auto i : all_fields) {
-      if(i.is_expr()){
+      if (i.is_expr()) {
         for (auto j : i.expr()->get_fields()) {
           if (j.get_aggr_type() != AggregationType::NONE) {
             fields_.push_back(j);

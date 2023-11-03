@@ -813,7 +813,6 @@ public:
               result += std::to_string(day);
           } break;
           default: {
-            result += format[i];
             result += format[i + 1];
           }
         }

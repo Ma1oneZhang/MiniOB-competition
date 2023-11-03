@@ -24,6 +24,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/executor/sql_result.h"
+#include "sql/stmt/create_table_stmt.h"
 #include "sql/stmt/stmt.h"
 #include "event/sql_event.h"
 #include "event/session_event.h"
@@ -34,28 +35,45 @@ using namespace common;
 RC OptimizeStage::handle_request(SQLStageEvent *sql_event)
 {
   unique_ptr<LogicalOperator> logical_operator(nullptr);
-  RC rc = create_logical_plan(sql_event, logical_operator);
-  if (rc != RC::SUCCESS) {
+  RC                          rc = create_logical_plan(sql_event, logical_operator);
+  if (sql_event->stmt()->type() == StmtType::CREATE_TABLE &&
+      static_cast<CreateTableStmt *>(sql_event->stmt())->with_select()) {
     if (rc != RC::UNIMPLENMENT) {
       LOG_WARN("failed to create logical plan. rc=%s", strrc(rc));
+      return rc;
     }
-    return rc;
+  } else {
+    if (rc != RC::SUCCESS) {
+      if (rc != RC::UNIMPLENMENT) {
+        LOG_WARN("failed to create logical plan. rc=%s", strrc(rc));
+      }
+      return rc;
+    }
   }
-
-  rc = rewrite(logical_operator);
+  rc = RC::SUCCESS;
+  if (sql_event->stmt()->type() != StmtType::CREATE_TABLE)
+    rc = rewrite(logical_operator);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to rewrite plan. rc=%s", strrc(rc));
     return rc;
   }
 
-  rc = optimize(logical_operator);
+  if (sql_event->stmt()->type() != StmtType::CREATE_TABLE)
+    rc = optimize(logical_operator);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to optimize plan. rc=%s", strrc(rc));
     return rc;
   }
 
   unique_ptr<PhysicalOperator> physical_operator;
-  rc = generate_physical_plan(logical_operator, physical_operator);
+  if (sql_event->stmt()->type() == StmtType::CREATE_TABLE) {
+    // create for create-table-select stmt
+    auto create_table_stmt = static_cast<CreateTableStmt *>(sql_event->stmt());
+    rc = generate_physical_plan(create_table_stmt->get_logical_operator(), create_table_stmt->get_physical_operator());
+  } else {
+    rc = generate_physical_plan(logical_operator, physical_operator);
+  }
+
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to generate physical plan. rc=%s", strrc(rc));
     return rc;
@@ -76,7 +94,7 @@ RC OptimizeStage::generate_physical_plan(
     unique_ptr<LogicalOperator> &logical_operator, unique_ptr<PhysicalOperator> &physical_operator)
 {
   RC rc = RC::SUCCESS;
-  rc = physical_plan_generator_.create(*logical_operator, physical_operator);
+  rc    = physical_plan_generator_.create(*logical_operator, physical_operator);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create physical operator. rc=%s", strrc(rc));
   }
@@ -86,11 +104,11 @@ RC OptimizeStage::generate_physical_plan(
 RC OptimizeStage::rewrite(unique_ptr<LogicalOperator> &logical_operator)
 {
   RC rc = RC::SUCCESS;
-  
+
   bool change_made = false;
   do {
     change_made = false;
-    rc = rewriter_.rewrite(logical_operator, change_made);
+    rc          = rewriter_.rewrite(logical_operator, change_made);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to do expression rewrite on logical plan. rc=%s", strrc(rc));
       return rc;
