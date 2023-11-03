@@ -115,7 +115,9 @@ RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
     // append current tuple into parent query tuples
     std::unordered_map<std::string, Tuple *> parent_query_tuples = get_parent_query_tuples();
     std::string table_name = tuple.get_table_name();
+    std::string table_alias = tuple.get_table()->alias();
     parent_query_tuples[table_name] = &tuple;
+    parent_query_tuples[table_alias] = &tuple;
     expr->set_parent_query_tuples(parent_query_tuples);
 
     rc = expr->get_value(tuple, value);

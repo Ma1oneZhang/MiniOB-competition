@@ -107,8 +107,11 @@ RC PredicatePhysicalOperator::next()
 
     auto table_tuple = dynamic_cast<RowTuple *>(tuple);
     if (table_tuple) {
-      std::string table_name          = table_tuple->get_table_name();
-      parent_query_tuples[table_name] = table_tuple;
+      const Table *table               = table_tuple->get_table();
+      std::string  table_name          = table_tuple->get_table_name();
+      std::string  table_alias         = table->alias();
+      parent_query_tuples[table_name]  = table_tuple;
+      parent_query_tuples[table_alias] = table_tuple;
       expression_->set_parent_query_tuples(parent_query_tuples);
     }
 

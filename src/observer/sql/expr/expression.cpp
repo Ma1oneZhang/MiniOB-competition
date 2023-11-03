@@ -26,7 +26,16 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value)
 
   if (rc == RC::NOTFOUND) {
     for (auto &pair : get_parent_query_tuples()) {
-      rc = pair.second->find_cell(TupleCellSpec(table_name(), field_name()), value);
+      string tuple_table_or_alias(pair.first);
+      string field_table(table_name());
+      if(tuple_table_or_alias == field_table) {
+        auto table_tuple = dynamic_cast<RowTuple *>(pair.second);
+        if (table_tuple) {
+          const char*  table_name = table_tuple->get_table_name();
+          rc = pair.second->find_cell(TupleCellSpec(table_name, field_name()), value);
+        }
+      }
+
       if (rc == RC::SUCCESS) {
         break;
       }

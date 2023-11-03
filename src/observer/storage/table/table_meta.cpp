@@ -122,6 +122,8 @@ RC TableMeta::remove_index(const IndexMeta &index)
 
 const char *TableMeta::name() const { return name_.c_str(); }
 
+const char *TableMeta::alias() const { return alias_.c_str(); }
+
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }
 
 const std::pair<const FieldMeta *, int> TableMeta::trx_fields() const

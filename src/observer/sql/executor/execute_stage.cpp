@@ -73,11 +73,20 @@ RC ExecuteStage::handle_request_with_physical_operator(SQLStageEvent *sql_event)
 
       for (const Field &field : select_stmt->query_fields()) {
         if (field.is_expr()) {
-          schema.append_cell(field.expr());
+          if (field.has_alias())
+            schema.append_cell(field.field_name());
+          else
+            schema.append_cell(field.expr());
+        } else if (field.has_alias()) {
+          schema.append_cell(field.field_name());
         } else if (field.get_aggr_type() != AggregationType::NONE) {
           schema.append_cell(TupleCellSpec(field.table_name(), field.aggr_name(), field.aggr_name()));
-        } else if (with_table_name) {
-          schema.append_cell(field.table_name(), field.field_name());
+        } 
+        // else if (field.has_alias()) {
+        //   schema.append_cell(field.field_name());
+        // } 
+        else if (with_table_name) {
+          schema.append_cell(field.table_alias_or_name(), field.field_name());
         } else {
           schema.append_cell(field.field_name());
         }

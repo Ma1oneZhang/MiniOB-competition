@@ -105,7 +105,8 @@ public:
    * @brief 表达式的名字，比如是字段名称，或者用户在执行SQL语句时输入的内容
    */
   virtual std::string                      name() const { return name_; }
-  virtual void                             set_name(std::string name) { name_ = name; }
+  virtual void                             set_name(std::string name) { has_name_ = true; name_ = name; }
+  virtual bool                             has_name() { return has_name_; }
   virtual std::vector<RelAttrSqlNode>      get_rel_attr_sql_node() { return {}; }
   virtual std::vector<Field>               get_fields() { return {}; }
   std::unordered_map<std::string, Tuple *> get_parent_query_tuples() { return parent_query_tuples_; };
@@ -119,6 +120,7 @@ public:
 
 private:
   std::string                              name_;
+  bool                                     has_name_ = false;
   std::unordered_map<std::string, Tuple *> parent_query_tuples_;
 };
 
@@ -153,13 +155,33 @@ public:
   virtual RC                          set_table_name(std::vector<Table *> &query_tables) override
   {
     if (sql_node_.relation_name != "") {
+      if (sql_node_.attribute_name == "*") {
+          return RC::SUCCESS;
+      }
       for (auto table : query_tables) {
         if (table->name() == sql_node_.relation_name) {
           field_ =
               Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()), sql_node_.aggregation_type);
+          if (field_.meta() == nullptr) {
+            return RC::NOTFOUND;
+          }
+          if (has_name()) {
+            field_.set_alias(name().c_str());
+          }
+          return RC::SUCCESS;
+        } else if (table->alias() == sql_node_.relation_name) {
+          field_ = 
+              Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()), sql_node_.aggregation_type);
+          if (field_.meta() == nullptr) {
+            return RC::NOTFOUND;
+          }
+          if (has_name()) {
+            field_.set_alias(name().c_str());
+          }
           return RC::SUCCESS;
         }
       }
+      return RC::NOTFOUND;
     } else {
       if (sql_node_.attribute_name == "*") {
         return RC::SUCCESS;
@@ -168,6 +190,12 @@ public:
         if (table->table_meta().field(sql_node_.attribute_name.c_str())) {
           field_ =
               Field(table, table->table_meta().field(sql_node_.attribute_name.c_str()), sql_node_.aggregation_type);
+          if (field_.meta() == nullptr) {
+            return RC::NOTFOUND;
+          }
+          if (has_name()) {
+            field_.set_alias(name().c_str());
+          }
           return RC::SUCCESS;
         }
       }
