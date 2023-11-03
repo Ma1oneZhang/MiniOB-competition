@@ -81,7 +81,8 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(SUBQUERY_TOO_MANY_COLUMNS)   \
   DEFINE_RC(NO_SUBQUERY)                 \
   DEFINE_RC(MULTI_COL_RETURN)            \
-  DEFINE_RC(MULTI_ROW_RETURN)
+  DEFINE_RC(MULTI_ROW_RETURN)            \
+  DEFINE_RC(REPEAT_ALIAS)
 
 enum class RC
 {

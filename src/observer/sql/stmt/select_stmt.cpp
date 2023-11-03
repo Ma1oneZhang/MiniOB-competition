@@ -98,7 +98,13 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       tables.emplace_back(table);
     }
     table_map[table_name] = table;
-    table_map[table_alias] = table;
+    if (table_alias != ""){
+      if (table_map.count(table_alias) == 0){
+        table_map[table_alias] = table;
+      } else {
+        return RC::REPEAT_ALIAS;
+      }
+    }
   }
   // add the join's table to the tables
   for (size_t i = 0; i < select_sql.joinctions.size(); i++) {
@@ -228,6 +234,13 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
       // check if the relation_attr is valid
       if (common::is_blank(relation_attr.relation_name.c_str()) &&
           0 == strcmp(relation_attr.attribute_name.c_str(), "*")) {
+        if(expr->has_name()) {
+          if (tables.size() != 1) {
+            return RC::MULTI_ROW_RETURN;
+          } else if (tables[0]->table_meta().field_num() != 1) {
+            return RC::MULTI_ROW_RETURN;
+          }
+        }
         for (Table *table : tables) {
           if (is_query_field) {
             wildcard_fields(table, query_fields);
@@ -256,6 +269,10 @@ RC SelectStmt::create(Db *db, const SelectSqlNode &select_sql, Stmt *&stmt)
 
           Table *table = iter->second;
           if (0 == strcmp(field_name, "*")) {
+            if (expr->has_name()) {
+              if (table->table_meta().field_num() != 1)
+                return RC::SCHEMA_FIELD_MISSING;
+            }
             if (is_query_field) {
               wildcard_fields(table, query_fields);
             }
