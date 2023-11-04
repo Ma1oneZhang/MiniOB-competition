@@ -76,6 +76,9 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
           break;
         } else if (Value::check_match_field_type(value.value.attr_type(), iter->type())) {
           // we only need match one of field
+          if (iter->type() == TEXTS && value.value.length() > 65535) {
+            return RC::INVALID_ARGUMENT;
+          }
           auto i = value.value;
           values.emplace_back(i);
           match = true;

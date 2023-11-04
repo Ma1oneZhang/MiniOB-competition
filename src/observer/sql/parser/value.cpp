@@ -604,6 +604,9 @@ bool Value::check_match_field_type(AttrType lhs, AttrType rhs)
         case FLOATS: {
           return true;
         } break;
+        case TEXTS: {
+          return true;
+        }
         default: {
           return false;
         } break;
@@ -637,6 +640,13 @@ bool Value::check_match_field_type(AttrType lhs, AttrType rhs)
         } break;
       }
     } break;
+    case TEXTS: {
+      if (rhs == CHARS) {
+        return true;
+      } else {
+        return false;
+      }
+    }
     default: {
       return false;
     } break;

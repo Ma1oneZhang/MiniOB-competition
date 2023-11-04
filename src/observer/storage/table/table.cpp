@@ -166,6 +166,7 @@ RC Table::drop()
   }
   // remove data file
   unlink(table_data_file(base_dir_.c_str(), table_meta_.name()).c_str());
+  unlink(table_text_file(base_dir_.c_str(), table_meta_.name()).c_str());
   if (EEXIST == errno) {
     LOG_ERROR("Drop Table %s error", table_meta_.name());
     return RC::SCHEMA_TABLE_NOT_EXIST;
@@ -350,7 +351,8 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   const int normal_field_start_index = table_meta_.sys_field_num();
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value     &value = values[i];
+    Value            value = values[i];
+    value.match_field_type(field->type());
 
     if (value.get_isnull()) {
       continue;
@@ -396,13 +398,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         memcpy(record_data + field->offset(), value.data(), copy_len);
       } else {
         // TEXT
-        Value text_val;
-        if (field->len() > MAX_TEXT_LENGTH) {
-          text_val.set_text(value.data(), MAX_TEXT_LENGTH);
-        } else {
-          text_val = value;
-        }
-
+        Value text_val = value;
         // upper
         auto                 required_num_of_page = (text_val.length() + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
         std::vector<Frame *> frame_list(required_num_of_page, nullptr);

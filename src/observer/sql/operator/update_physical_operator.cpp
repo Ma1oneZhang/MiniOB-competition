@@ -70,6 +70,38 @@ RC UpdatePhysicalOperator::next()
       } else if (value.get_isnull()) {
         return RC::FIELD_COULD_NOT_BE_NULL;
       }
+      if (field->type() == TEXTS) {
+        auto text_buffer_pool_ = table_->get_text_buffer_pool();
+        // TEXT
+        Value text_val = value;
+        // upper
+        auto                 required_num_of_page = (text_val.length() + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
+        std::vector<Frame *> frame_list(required_num_of_page, nullptr);
+        std::vector<int>     frame_num_list;
+        size_t               offset = 0;
+        for (int i = 0; i < required_num_of_page; i++) {
+          text_buffer_pool_->allocate_page(&frame_list[i]);
+          memcpy(frame_list[i]->page().data,
+              value.data() + offset,
+              (value.length() - offset > BP_PAGE_DATA_SIZE ? BP_PAGE_DATA_SIZE : text_val.length() - offset));
+          if (value.length() - offset < BP_PAGE_DATA_SIZE) {
+            memset(frame_list[i]->page().data + (value.length() - offset),
+                0,
+                BP_PAGE_DATA_SIZE - (value.length() - offset));
+          }
+          offset += BP_PAGE_DATA_SIZE;
+          frame_num_list.push_back(frame_list[i]->page_num());
+          frame_list[i]->mark_dirty();
+          text_buffer_pool_->unpin_page(frame_list[i]);
+        }
+        *(int *)(record.data() + field->offset()) = required_num_of_page;
+        memcpy(
+            record.data() + field->offset() + sizeof(int), frame_num_list.data(), required_num_of_page * sizeof(int));
+        memset(record.data() + field->offset() + sizeof(int) + required_num_of_page * sizeof(int),
+            -1,                                         // all 1 in bit exprssion
+            (9 - required_num_of_page) * sizeof(int));  // rest of all
+        continue;
+      }
       // check the field is same, if is same, we dont need do any thing
       if (memcmp(record.data() + attr_offset, value.data(), attr_len) == 0) {
         // do nothing
