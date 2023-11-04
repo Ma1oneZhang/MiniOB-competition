@@ -94,7 +94,7 @@ public:
   int32_t     table_id() const { return table_meta_.table_id(); }
   const char *name() const;
 
-  RC set_alias(const char* alias) { return table_meta_.set_alias(alias); }
+  RC          set_alias(const char *alias) { return table_meta_.set_alias(alias); }
   const char *alias() const;
 
   const TableMeta &table_meta() const;
@@ -109,13 +109,15 @@ private:
   RC init_record_handler(const char *base_dir);
 
 public:
-  Index *find_index(const char *index_name) const;
-  Index *find_index_by_field(std::vector<const char *> field_name) const;
+  Index          *find_index(const char *index_name) const;
+  Index          *find_index_by_field(std::vector<const char *> field_name) const;
+  DiskBufferPool *get_text_buffer_pool() { return text_buffer_pool_; }
 
 private:
   std::string          base_dir_;
   TableMeta            table_meta_;
   DiskBufferPool      *data_buffer_pool_ = nullptr;  /// 数据文件关联的buffer pool
+  DiskBufferPool      *text_buffer_pool_ = nullptr;  /// 文本文件关联的buffer pool
   RecordFileHandler   *record_handler_   = nullptr;  /// 记录操作
   std::vector<Index *> indexes_;
 };

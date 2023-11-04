@@ -161,9 +161,16 @@ public:
       bool null               = (bitmap & (1 << (index % 8))) != 0;
       if (null) {
         cell.set_isnull();
+        return RC::SUCCESS;
       }
     }
 
+    if (field_meta->type() == TEXTS) {
+      auto text_address =
+          reinterpret_cast<char **>(const_cast<char *>(this->record_.data()) + field_meta->offset() + 4);
+      cell.set_text(*text_address, *(int *)(this->record_.data() + field_meta->offset()));
+      return RC::SUCCESS;
+    }
     cell.set_type(field_meta->type());
     cell.set_data(this->record_.data() + field_meta->offset(), field_meta->len());
     return RC::SUCCESS;

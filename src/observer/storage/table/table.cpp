@@ -20,6 +20,9 @@ See the Mulan PSL v2 for more details. */
 #include <unistd.h>
 
 #include "common/defs.h"
+#include "sql/parser/value.h"
+#include "storage/buffer/frame.h"
+#include "storage/buffer/page.h"
 #include "storage/table/table.h"
 #include "common/rc.h"
 #include "storage/field/field_meta.h"
@@ -34,6 +37,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/index/bplus_tree_index.h"
 #include "storage/trx/trx.h"
 
+constexpr size_t MAX_TEXT_LENGTH = 65535;
+
 Table::~Table()
 {
   if (record_handler_ != nullptr) {
@@ -44,6 +49,10 @@ Table::~Table()
   if (data_buffer_pool_ != nullptr) {
     data_buffer_pool_->close_file();
     data_buffer_pool_ = nullptr;
+  }
+  if (text_buffer_pool_ != nullptr) {
+    text_buffer_pool_->close_file();
+    text_buffer_pool_ = nullptr;
   }
 
   for (std::vector<Index *>::iterator it = indexes_.begin(); it != indexes_.end(); ++it) {
@@ -103,9 +112,21 @@ RC Table::create(int32_t table_id, const char *path, const char *name, const cha
   table_meta_.serialize(fs);
   fs.close();
 
-  std::string        data_file = table_data_file(base_dir, name);
-  BufferPoolManager &bpm       = BufferPoolManager::instance();
-  rc                           = bpm.create_file(data_file.c_str());
+  std::string data_file = table_data_file(base_dir, name);
+  std::string text_file = table_text_file(base_dir, name);
+
+  BufferPoolManager &bpm = BufferPoolManager::instance();
+  rc                     = bpm.create_file(data_file.c_str());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to create disk buffer pool of data file. file name=%s", data_file.c_str());
+    return rc;
+  }
+  rc = bpm.create_file(text_file.c_str());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to create disk buffer pool of data file. file name=%s", data_file.c_str());
+    return rc;
+  }
+  rc = bpm.open_file(text_file.c_str(), text_buffer_pool_);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to create disk buffer pool of data file. file name=%s", data_file.c_str());
     return rc;
@@ -167,7 +188,6 @@ RC Table::open(const char *meta_file, const char *base_dir)
     return RC::INTERNAL;
   }
   fs.close();
-
   // 加载数据文件
   RC rc = init_record_handler(base_dir);
   if (rc != RC::SUCCESS) {
@@ -176,7 +196,9 @@ RC Table::open(const char *meta_file, const char *base_dir)
     return rc;
   }
 
-  base_dir_ = base_dir;
+  auto text_file = table_text_file(base_dir, table_meta_.name());
+  rc             = BufferPoolManager::instance().open_file(text_file.c_str(), text_buffer_pool_);
+  base_dir_      = base_dir;
 
   const int index_num = table_meta_.index_num();
   for (int i = 0; i < index_num; i++) {
@@ -220,11 +242,11 @@ RC Table::insert_record(Record &record)
 
   for (int i = 0; i < indexes_.size(); i++) {
     auto index = indexes_[i];
-    rc = index->insert_entry(record.data(), &record.rid());
+    rc         = index->insert_entry(record.data(), &record.rid());
     if (rc != RC::SUCCESS) {  // 可能出现了键值重复
       for (int j = i - 1; j >= 0; j--) {
         auto index = indexes_[j];
-        rc = index->delete_entry(record.data(), &record.rid());
+        rc         = index->delete_entry(record.data(), &record.rid());
         if (rc != RC::SUCCESS) {
           LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
                 name(), rc, strrc(rc));
@@ -330,7 +352,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value     &value = values[i];
 
-    if(value.get_isnull()){
+    if (value.get_isnull()) {
       continue;
     }
 
@@ -342,10 +364,10 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   }
 
   // 复制所有字段的值
-  int   record_size = table_meta_.record_size();
-  char *record_data = (char *)malloc(record_size);
+  int   record_size        = table_meta_.record_size();
+  char *record_data        = (char *)malloc(record_size);
   int   null_bitmap_offset = table_meta_.null_bitmap_offset();
-  int   null_bitmap_size = table_meta_.null_bitmap_size();
+  int   null_bitmap_size   = table_meta_.null_bitmap_size();
   char  null_bitmap[null_bitmap_size];
   memset(null_bitmap, 0, null_bitmap_size);
   for (int i = 0; i < value_num; i++) {
@@ -355,7 +377,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
     // set null bitmap
     if (value.get_isnull()) {
-      null_bitmap[i / 8] |= (1 << (i % 8));      
+      null_bitmap[i / 8] |= (1 << (i % 8));
     } else {
       null_bitmap[i / 8] &= ~(1 << (i % 8));
     }
@@ -370,11 +392,47 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
       // magic number 0x7F
       memset(record_data + field->offset(), 0x7f, copy_len);
     } else {
-      memcpy(record_data + field->offset(), value.data(), copy_len);
+      if (field->type() != TEXTS) {
+        memcpy(record_data + field->offset(), value.data(), copy_len);
+      } else {
+        // TEXT
+        Value text_val;
+        if (field->len() > MAX_TEXT_LENGTH) {
+          text_val.set_text(value.data(), MAX_TEXT_LENGTH);
+        } else {
+          text_val = value;
+        }
+
+        // upper
+        auto                 required_num_of_page = (text_val.length() + BP_PAGE_DATA_SIZE - 1) / BP_PAGE_DATA_SIZE;
+        std::vector<Frame *> frame_list(required_num_of_page, nullptr);
+        std::vector<int>     frame_num_list;
+        size_t               offset = 0;
+        for (int i = 0; i < required_num_of_page; i++) {
+          text_buffer_pool_->allocate_page(&frame_list[i]);
+          memcpy(frame_list[i]->page().data,
+              value.data() + offset,
+              (value.length() - offset > BP_PAGE_DATA_SIZE ? BP_PAGE_DATA_SIZE : text_val.length() - offset));
+          if (value.length() - offset < BP_PAGE_DATA_SIZE) {
+            memset(frame_list[i]->page().data + (value.length() - offset),
+                0,
+                BP_PAGE_DATA_SIZE - (value.length() - offset));
+          }
+          offset += BP_PAGE_DATA_SIZE;
+          frame_num_list.push_back(frame_list[i]->page_num());
+          frame_list[i]->mark_dirty();
+          text_buffer_pool_->unpin_page(frame_list[i]);
+        }
+        *(int *)(record_data + field->offset()) = required_num_of_page;
+        memcpy(record_data + field->offset() + sizeof(int), frame_num_list.data(), required_num_of_page * sizeof(int));
+        memset(record_data + field->offset() + sizeof(int) + required_num_of_page * sizeof(int),
+            -1,                                         // all 1 in bit exprssion
+            (9 - required_num_of_page) * sizeof(int));  // rest of all
+      }
     }
   }
 
-  memcpy(record_data+null_bitmap_offset, null_bitmap, null_bitmap_size);
+  memcpy(record_data + null_bitmap_offset, null_bitmap, null_bitmap_size);
 
   record.set_data_owner(record_data, record_size);
   return RC::SUCCESS;

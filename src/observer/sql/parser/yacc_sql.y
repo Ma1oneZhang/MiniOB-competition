@@ -94,6 +94,7 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
         STRING_T
         FLOAT_T
         DATE_T
+        TEXT_T
         HELP
         EXIT
         DOT //QUOTE
@@ -458,6 +459,9 @@ attr_def:
       $$->name = $1;
       $$->length = $4;
       $$->nullable = true;
+      if((AttrType)$2 == AttrType::TEXTS){
+        $$->length = 40;
+      }
       free($1);
     }
     | ID type LBRACE number RBRACE NOT NULL_TOKEN
@@ -467,6 +471,9 @@ attr_def:
       $$->name = $1;
       $$->length = $4;
       $$->nullable = false;
+      if((AttrType)$2 == AttrType::TEXTS){
+        $$->length = 40;
+      }
       free($1);
     }
     | ID type LBRACE number RBRACE 
@@ -476,6 +483,9 @@ attr_def:
       $$->name = $1;
       $$->length = $4;
       $$->nullable = true;
+      if((AttrType)$2 == AttrType::TEXTS){
+        $$->length = 40;
+      }
       free($1);
     }
     | ID type NULL_TOKEN
@@ -485,6 +495,9 @@ attr_def:
       $$->name = $1;
       $$->length = 4;
       $$->nullable = true;
+      if((AttrType)$2 == AttrType::TEXTS){
+        $$->length = 40;
+      }
       free($1);
     }
     | ID type NOT NULL_TOKEN
@@ -494,6 +507,9 @@ attr_def:
       $$->name = $1;
       $$->length = 4;
       $$->nullable = false;
+      if((AttrType)$2 == AttrType::TEXTS){
+        $$->length = 40;
+      }
       free($1);
     }
     | ID type
@@ -503,6 +519,9 @@ attr_def:
       $$->name = $1;
       $$->length = 4;
       $$->nullable = true;
+      if((AttrType)$2 == AttrType::TEXTS){
+        $$->length = 40;
+      }
       free($1);
     }
     ;
@@ -514,6 +533,7 @@ type:
     | STRING_T { $$=CHARS; }
     | FLOAT_T  { $$=FLOATS; }
     | DATE_T   { $$=DATES; }
+    | TEXT_T   { $$=TEXTS; }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
     INSERT INTO ID VALUES tuple tuple_list

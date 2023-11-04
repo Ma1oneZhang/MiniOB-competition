@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/defs.h"
 #include "storage/common/meta_util.h"
+#include <string>
 
 std::string table_meta_file(const char *base_dir, const char *table_name)
 {
@@ -26,4 +27,8 @@ std::string table_data_file(const char *base_dir, const char *table_name)
 std::string table_index_file(const char *base_dir, const char *table_name, const char *index_name)
 {
   return std::string(base_dir) + common::FILE_PATH_SPLIT_STR + table_name + "-" + index_name + TABLE_INDEX_SUFFIX;
+}
+std::string table_text_file(const char *base_dir, const char *table_name)
+{
+  return std::string(base_dir) + common::FILE_PATH_SPLIT_STR + table_name + "-" + "text" + TABLE_INDEX_SUFFIX;
 }

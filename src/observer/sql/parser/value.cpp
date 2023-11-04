@@ -19,12 +19,15 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/comparator.h"
 #include "common/lang/string.h"
 
-const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "dates", "floats", "booleans"};
+const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "dates", "floats", "booleans", "texts"};
 
 const char *attr_type_to_string(AttrType type)
 {
   if (type >= UNDEFINED && type <= FLOATS) {
     return ATTR_TYPE_NAME[type];
+  }
+  if (type == TEXTS) {
+    return ATTR_TYPE_NAME[6];
   }
   return "unknown";
 }
@@ -72,6 +75,9 @@ void Value::set_data(char *data, int length)
     case DATES: {
       num_value_.date_value_ = *(int *)data;
     } break;
+    case TEXTS: {
+      set_text(data, length);
+    } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -102,6 +108,18 @@ void Value::set_string(const char *s, int len /*= 0*/)
   if (len > 0) {
     len = strnlen(s, len);
     str_value_.assign(s, len);
+  } else {
+    str_value_.assign(s);
+  }
+  length_ = str_value_.length();
+}
+
+void Value::set_text(const char *s, int len /*= 0*/)
+{
+  attr_type_ = TEXTS;
+  if (len > 0) {
+    len = strnlen(s, len);
+    str_value_.assign(s);
   } else {
     str_value_.assign(s);
   }
@@ -154,6 +172,9 @@ void Value::set_value(const Value &value)
       // do nothing
       // for reduce the compiler warning
     } break;
+    case TEXTS: {
+      set_string(value.get_string().c_str());
+    } break;
     case UNDEFINED: {
       ASSERT(false, "got an invalid value type");
     } break;
@@ -175,6 +196,9 @@ const char *Value::data() const
 {
   switch (attr_type_) {
     case CHARS: {
+      return str_value_.c_str();
+    } break;
+    case TEXTS: {
       return str_value_.c_str();
     } break;
     default: {
@@ -213,6 +237,9 @@ std::string Value::to_string() const
       sprintf(date_str, "%04d-%02d-%02d", y, m, d);
       res = date_str;
     } break;
+    case TEXTS: {
+      res = str_value_;
+    } break;
     default: {
       LOG_WARN("unsupported attr type: %d", attr_type_);
     } break;
@@ -240,6 +267,12 @@ int Value::compare(const Value &other) const
         return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other.num_value_.float_value_);
       } break;
       case CHARS: {
+        return common::compare_string((void *)this->str_value_.c_str(),
+            this->str_value_.length(),
+            (void *)other.str_value_.c_str(),
+            other.str_value_.length());
+      } break;
+      case TEXTS: {
         return common::compare_string((void *)this->str_value_.c_str(),
             this->str_value_.length(),
             (void *)other.str_value_.c_str(),
@@ -532,6 +565,21 @@ bool Value::match_field_type(AttrType field_type)
         } break;
       }
       break;
+    case AttrType::TEXTS: {
+      switch (attr_type_) {
+        case AttrType::CHARS: {
+          if (str_value_.size() > 65535) {
+            return false;
+          }
+          set_text(data(), length_);
+          return true;
+        } break;
+        default: {
+          LOG_WARN("WARN TYPE CONVERSTION");
+          return false;
+        } break;
+      }
+    }
     default:
       // the coversion failed
       return false;
