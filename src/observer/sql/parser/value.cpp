@@ -123,6 +123,7 @@ void Value::set_text(const char *s, int len /*= 0*/)
   } else {
     str_value_.assign(s);
   }
+  LOG_WARN("str size = %d", str_value_.length());
   length_ = str_value_.length();
 }
 

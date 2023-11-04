@@ -165,6 +165,7 @@ RC Table::drop()
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
   // remove data file
+  text_buffer_pool_->close_file();
   unlink(table_data_file(base_dir_.c_str(), table_meta_.name()).c_str());
   unlink(table_text_file(base_dir_.c_str(), table_meta_.name()).c_str());
   if (EEXIST == errno) {
@@ -406,14 +407,10 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         size_t               offset = 0;
         for (int i = 0; i < required_num_of_page; i++) {
           text_buffer_pool_->allocate_page(&frame_list[i]);
+          memset(frame_list[i]->page().data, 0, BP_PAGE_DATA_SIZE);
           memcpy(frame_list[i]->page().data,
               value.data() + offset,
               (value.length() - offset > BP_PAGE_DATA_SIZE ? BP_PAGE_DATA_SIZE : text_val.length() - offset));
-          if (value.length() - offset < BP_PAGE_DATA_SIZE) {
-            memset(frame_list[i]->page().data + (value.length() - offset),
-                0,
-                BP_PAGE_DATA_SIZE - (value.length() - offset));
-          }
           offset += BP_PAGE_DATA_SIZE;
           frame_num_list.push_back(frame_list[i]->page_num());
           frame_list[i]->mark_dirty();

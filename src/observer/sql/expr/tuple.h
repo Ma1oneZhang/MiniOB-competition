@@ -168,7 +168,11 @@ public:
     if (field_meta->type() == TEXTS) {
       auto text_address =
           reinterpret_cast<char **>(const_cast<char *>(this->record_.data()) + field_meta->offset() + 4);
-      cell.set_text(*text_address, *(int *)(this->record_.data() + field_meta->offset()));
+      std::string str;
+      for (int i = 0; i < *(int *)(this->record_.data() + field_meta->offset()); i++) {
+        str += (*text_address)[i];
+      }
+      cell.set_text(str.c_str());
       return RC::SUCCESS;
     }
     cell.set_type(field_meta->type());
